@@ -12,10 +12,9 @@ from typing import Any, Dict, Optional
 
 import rclpy
 from rclpy.executors import SingleThreadedExecutor
-from rclpy.node import Node
-from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
-from sensor_msgs.msg import JointState
-from trajectory_msgs.msg import JointTrajectory
+
+# Assumes 'polyflow-core' is in the PYTHONPATH, allowing `from common...`
+from common.polyflow_node import PolyflowNode
 
 
 def _now_monotonic_s() -> float:
@@ -283,35 +282,25 @@ class CANSimpleAxis:
             self._last_command_torque_nm = float(torque_nm)
 
 
-class ODriveS1Controller(Node):
+class ODriveS1Controller(PolyflowNode):
     """
-    ROS2 node that bridges incoming JointTrajectory commands to an ODrive S1.
+    Polyflow node that bridges incoming trajectory commands to an ODrive S1.
     """
 
     def __init__(self):
-        # Parse environment-provided node metadata
-        parameters = self._load_json_env("POLYFLOW_PARAMETERS", {})
-        configuration = self._load_json_env("POLYFLOW_CONFIGURATION", {})
-        inbound = self._load_json_env("POLYFLOW_INBOUND_CONNECTIONS", [])
-        outbound = self._load_json_env("POLYFLOW_OUTBOUND_CONNECTIONS", [])
-        self.node_id = os.environ.get("POLYFLOW_NODE_ID", "odrive_s1")
-
-        super().__init__("odrive_s1_node", namespace=configuration.get("namespace", ""))
+        # PolyflowNode handles node_id, inbound/outbound connections, and ROS node init
+        super().__init__()
         self.get_logger().set_level(rclpy.logging.LoggingSeverity.DEBUG)
+        # Parameters and configuration are loaded by the PolyflowNode base class.
 
-        self.parameters: Dict[str, Any] = parameters
-        self.configuration: Dict[str, Any] = configuration
-        self.inbound_connections = inbound
-        self.outbound_connections = outbound
-
-        self.joint_id = parameters.get("joint")
-        self.control_mode = parameters.get("control_mode", "position")
-        self.transport = parameters.get("transport", "usb")
+        self.joint_id = self.get_param("joint")
+        self.control_mode = self.get_param("control_mode", "position")
+        self.transport = self.get_param("transport", "usb")
 
         # Gear ratio: motor_turns = output_turns * gear_ratio
-        gear_ratio = float(parameters.get("gear_ratio", 1.0))
+        gear_ratio = float(self.get_param("gear_ratio", 1.0))
 
-        units = str(parameters.get("units", "radians")).lower().strip()
+        units = str(self.get_param("units", "radians")).lower().strip()
         if units in ("turn", "turns"):
             default_cmd_pos_scale = 1.0 * gear_ratio
             default_cmd_vel_scale = 1.0 * gear_ratio
@@ -323,61 +312,48 @@ class ODriveS1Controller(Node):
             default_state_pos_scale = float(math.tau) / gear_ratio
             default_state_vel_scale = float(math.tau) / gear_ratio
 
-        self.cmd_position_scale = float(parameters.get("cmd_position_scale", default_cmd_pos_scale))
-        self.cmd_velocity_scale = float(parameters.get("cmd_velocity_scale", default_cmd_vel_scale))
-        self.state_position_scale = float(parameters.get("state_position_scale", default_state_pos_scale))
-        self.state_velocity_scale = float(parameters.get("state_velocity_scale", default_state_vel_scale))
+        self.cmd_position_scale = float(self.get_param("cmd_position_scale", default_cmd_pos_scale))
+        self.cmd_velocity_scale = float(self.get_param("cmd_velocity_scale", default_cmd_vel_scale))
+        self.state_position_scale = float(self.get_param("state_position_scale", default_state_pos_scale))
+        self.state_velocity_scale = float(self.get_param("state_velocity_scale", default_state_vel_scale))
 
         # CAN transport parameters (only used when `transport="can"`)
-        self.can_node_id = int(parameters.get("can.node_id", 0))
-        self.can_interface = str(parameters.get("can.interface", "socketcan"))
-        self.can_channel = str(parameters.get("can.channel", "can0"))
-        self.can_bitrate = parameters.get("can.bitrate")
+        self.can_node_id = int(self.get_param("can.node_id", 0))
+        self.can_interface = str(self.get_param("can.interface", "socketcan"))
+        self.can_channel = str(self.get_param("can.channel", "can0"))
+        self.can_bitrate = self.get_param("can.bitrate")
         if self.can_bitrate in (None, "", 0, "0"):
             self.can_bitrate = None
-        self.can_poll_hz = float(parameters.get("can.poll_hz", 50.0))
-        self.can_request_iq = bool(parameters.get("can.request_iq", False))
-        self.can_heartbeat_timeout_s = float(parameters.get("can.heartbeat_timeout_s", 2.0))
-        self.can_enable_closed_loop_on_start = bool(parameters.get("can.enable_closed_loop_on_start", True))
-        self.can_torque_constant = parameters.get("can.torque_constant")
+        self.can_poll_hz = float(self.get_param("can.poll_hz", 50.0))
+        self.can_request_iq = bool(self.get_param("can.request_iq", False))
+        self.can_heartbeat_timeout_s = float(self.get_param("can.heartbeat_timeout_s", 2.0))
+        self.can_enable_closed_loop_on_start = bool(self.get_param("can.enable_closed_loop_on_start", True))
+        self.can_torque_constant = self.get_param("can.torque_constant")
         if self.can_torque_constant is not None:
             self.can_torque_constant = float(self.can_torque_constant)
 
-        self.can_command_ids = parameters.get("can.command_ids")
+        self.can_command_ids = self.get_param("can.command_ids")
         if self.can_command_ids is not None and not isinstance(self.can_command_ids, dict):
             self.can_command_ids = None
-        self.lower_position = self._first_param(["limit.lower_position", "lower_position"])
-        self.upper_position = self._first_param(["limit.upper_position", "upper_position"])
-        self.position_step = self._first_param(["limit.position_step", "position_step"])
-        self.max_effort = self._first_param(["limit.max_effort", "max_effort"])
-        self.effort_step = self._first_param(["limit.effort_step", "effort_step"])
-        self.max_velocity = self._first_param(["limit.max_velocity", "max_velocity"])
-        self.velocity_step = self._first_param(["limit.velocity_step", "velocity_step"])
+        self.lower_position = self.get_param(["limit.lower_position", "lower_position"])
+        self.upper_position = self.get_param(["limit.upper_position", "upper_position"])
+        self.position_step = self.get_param(["limit.position_step", "position_step"])
+        self.max_effort = self.get_param(["limit.max_effort", "max_effort"])
+        self.effort_step = self.get_param(["limit.effort_step", "effort_step"])
+        self.max_velocity = self.get_param(["limit.max_velocity", "max_velocity"])
+        self.velocity_step = self.get_param(["limit.velocity_step", "velocity_step"])
 
         # Smoothing parameters
-        self.smoothing_alpha = float(parameters.get("smoothing_alpha", 0.0))  # 0 = no smoothing, 0.9 = heavy smoothing
+        self.smoothing_alpha = float(self.get_param("smoothing_alpha", 0.0))  # 0 = no smoothing, 0.9 = heavy smoothing
         self._last_commanded_position: Dict[str, float] = {}
         self._last_commanded_velocity: Dict[str, float] = {}
 
         self.axes: Dict[str, Any] = {}
 
-        # Use system default QoS for maximum compatibility
-        from rclpy.qos import qos_profile_system_default
-        qos_profile = qos_profile_system_default
-
-        topics = self._inbound_topics()
-        self.get_logger().info(f"Creating subscriptions for topics: {topics}")
-        self._trajectory_subscriptions = [
-            self.create_subscription(JointTrajectory, topic, self._trajectory_callback, qos_profile) for topic in topics
-        ]
-        self.get_logger().info(f"Successfully subscribed to {len(self._trajectory_subscriptions)} topics: {topics}")
-        self.get_logger().info(f"Node namespace: '{self.get_namespace()}', QoS: system_default")
-        for i, (topic, sub) in enumerate(zip(topics, self._trajectory_subscriptions)):
-            self.get_logger().info(f"  Subscription {i}: topic='{topic}', resolved='{sub.topic_name}', valid={sub is not None}")
-
-        self.joint_state_pub = self.create_publisher(JointState, "joint/state", 10)
-
-        rate_hz = configuration.get("rate_hz", 50)
+        # The PolyflowNode base class handles all ROS subscriptions and publishers
+        # for graph communication. We only need a timer to periodically publish
+        # the joint state.
+        rate_hz = self.configuration.get("rate_hz", 50)
         period = 1.0 / rate_hz if rate_hz else 0.02
         self.joint_state_timer = self.create_timer(period, self._publish_joint_state)
 
@@ -397,24 +373,6 @@ class ODriveS1Controller(Node):
         )
 
     @staticmethod
-    def _load_json_env(key: str, default: Any) -> Any:
-        raw = os.environ.get(key)
-        if not raw:
-            return default
-        try:
-            return json.loads(raw)
-        except json.JSONDecodeError:
-            return default
-
-    def _first_param(self, keys, default=None):
-        if isinstance(keys, str):
-            keys = [keys]
-        for key in keys:
-            if key in self.parameters:
-                return self.parameters[key]
-        return default
-
-    @staticmethod
     def _clamp(value: float, min_v: Optional[float], max_v: Optional[float]) -> float:
         if min_v is not None:
             value = max(value, float(min_v))
@@ -428,17 +386,6 @@ class ODriveS1Controller(Node):
             return value
         return round(value / float(step)) * float(step)
 
-    def _inbound_topics(self):
-        topics = []
-        for conn in self.inbound_connections:
-            if isinstance(conn, str):
-                topics.append(conn)
-
-        # Default to the WebRTC JointTrajectory bridge topic
-        for default_topic in ("/robot/joint/trajectory", "webrtc"):
-            if default_topic not in topics:
-                topics.append(default_topic)
-        return topics
 
     def register_axis(self, joint_id: str, axis: Any) -> None:
         self.axes[joint_id] = axis
@@ -448,33 +395,48 @@ class ODriveS1Controller(Node):
             except Exception as exc:  # Hardware config errors should not crash the node
                 self.get_logger().warning(f"Failed to set velocity limit on {joint_id}: {exc}")
 
-    def _trajectory_callback(self, msg: JointTrajectory) -> None:
+    def process_input(self, pin_id: str, data: Any):
+        """
+        Handles incoming trajectory commands from the Polyflow graph.
+        This method is called by the PolyflowNode base class.
+        """
+        if not self.should_run(trigger_info={'pin_id': pin_id}):
+            return
+
+        # The input pin for trajectory commands.
+        if pin_id != "trajectory":
+            self.get_logger().debug(f"Ignoring input on unhandled pin '{pin_id}'")
+            return
+
         self.get_logger().info(
-            f"_trajectory_callback invoked! joint_names={msg.joint_names}, "
-            f"num_points={len(msg.points)}, configured_joint_id={self.joint_id}"
+            f"process_input invoked! pin_id={pin_id}, data={data}"
         )
 
-        if not msg.joint_names or not msg.points or not self.joint_id:
-            self.get_logger().debug("Received empty JointTrajectory")
+        if not isinstance(data, dict):
+            self.get_logger().warn("Trajectory payload must be an object")
             return
 
-        try:
-            idx = msg.joint_names.index(self.joint_id)
-        except ValueError:
-            self.get_logger().debug(f"Joint {self.joint_id} not present in trajectory command")
+        # Check if the command is for the joint this node controls
+        joint_id = data.get("jointId") or data.get("joint_id")
+        if joint_id != self.joint_id:
+            self.get_logger().debug(f"Ignoring command for joint '{joint_id}' (this node controls '{self.joint_id}')")
             return
 
-        self.get_logger().info(f"Received JointTrajectory for joint {self.joint_id}")
-        point = msg.points[-1]
+        point_data = data.get("point") or data.get("points", [{}])
+        if isinstance(point_data, list):
+            point_data = point_data[-1] if point_data else {}
+
+        if not isinstance(point_data, dict):
+            self.get_logger().warn("Trajectory point must be an object")
+            return
+
         position = None
         velocity = None
         effort = None
-        if point.positions and idx < len(point.positions):
-            position = point.positions[idx]
-        if point.velocities and idx < len(point.velocities):
-            velocity = point.velocities[idx]
-        if point.effort and idx < len(point.effort):
-            effort = point.effort[idx]
+        if point_data.get("positions"): position = point_data["positions"][0]
+        if point_data.get("velocities"): velocity = point_data["velocities"][0]
+        if point_data.get("effort"): effort = point_data["effort"][0]
+        elif point_data.get("efforts"): effort = point_data["efforts"][0]
 
         self._apply_command(self.joint_id, position, velocity, effort)
 
@@ -530,10 +492,14 @@ class ODriveS1Controller(Node):
         if not self.axes:
             return
 
-        msg = JointState()
-        msg.header.stamp = self.get_clock().now().to_msg()
+        # The output pin for joint state.
+        output_pin_id = "joint_state"
+        if output_pin_id not in self.output_pins:
+            return
 
         for joint_id, axis in self.axes.items():
+            if joint_id != self.joint_id:
+                continue
             try:
                 pos = float(axis.encoder.pos_estimate) * float(self.state_position_scale)
                 vel = float(axis.encoder.vel_estimate) * float(self.state_velocity_scale)
@@ -543,169 +509,144 @@ class ODriveS1Controller(Node):
                 if torque_constant is not None and iq_measured is not None:
                     effort = float(torque_constant) * float(iq_measured)
 
-                msg.name.append(joint_id)
-                msg.position.append(pos)
-                msg.velocity.append(vel)
-                msg.effort.append(effort if effort is not None else 0.0)
+                # This payload mimics sensor_msgs/JointState for downstream consumers
+                payload = {
+                    "name": [joint_id],
+                    "position": [pos],
+                    "velocity": [vel],
+                    "effort": [effort if effort is not None else 0.0],
+                    "timestamp": time.time()
+                }
+                self.publish_to_pin(output_pin_id, payload)
+
             except Exception as exc:
                 self.get_logger().warning(f"Failed to read state for {joint_id}: {exc}")
-                continue
 
-        if msg.name:
-            self.joint_state_pub.publish(msg)
+    async def run_async(self):
+        """
+        Main async loop for the ODrive S1 controller. Connects to the hardware
+        and enters a polling loop. This method is called by `PolyflowNode.main()`.
+        """
+        if str(self.transport).lower().strip() == "can":
+            try:
+                axis = CANSimpleAxis(
+                    node_id=self.can_node_id,
+                    can_interface=self.can_interface,
+                    can_channel=self.can_channel,
+                    can_bitrate=int(self.can_bitrate) if self.can_bitrate is not None else None,
+                    torque_constant=self.can_torque_constant,
+                    command_ids=self.can_command_ids,
+                    logger=self.get_logger(),
+                )
+            except ImportError:
+                self.get_logger().error("CAN transport selected but `python-can` is not installed")
+                while rclpy.ok():
+                    await asyncio.sleep(1.0)
+                return
+            except Exception as exc:
+                self.get_logger().error(f"Failed to open CAN interface {self.can_interface}:{self.can_channel}: {exc}")
+                return
 
+            if not self.joint_id:
+                self.get_logger().error("No joint_id configured; cannot register ODrive axis")
+                axis.shutdown()
+                return
 
-async def run_odrive(node: ODriveS1Controller):
-    if str(node.transport).lower().strip() == "can":
-        try:
-            axis = CANSimpleAxis(
-                node_id=node.can_node_id,
-                can_interface=node.can_interface,
-                can_channel=node.can_channel,
-                can_bitrate=int(node.can_bitrate) if node.can_bitrate is not None else None,
-                torque_constant=node.can_torque_constant,
-                command_ids=node.can_command_ids,
-                logger=node.get_logger(),
+            self.register_axis(self.joint_id, axis)
+            self.get_logger().info(
+                f"Connected to ODrive CANSimple (node_id={self.can_node_id}, {self.can_interface}:{self.can_channel}), bitrate={self.can_bitrate}"
             )
+
+            if self.control_mode == "velocity":
+                axis.set_controller_mode(axis.CONTROL_MODE_VELOCITY_CONTROL, axis.INPUT_MODE_PASSTHROUGH)
+            elif self.control_mode == "torque":
+                axis.set_controller_mode(axis.CONTROL_MODE_TORQUE_CONTROL, axis.INPUT_MODE_PASSTHROUGH)
+            else:
+                axis.set_controller_mode(axis.CONTROL_MODE_POSITION_CONTROL, axis.INPUT_MODE_PASSTHROUGH)
+
+            heartbeat_deadline_s = _now_monotonic_s() + float(self.can_heartbeat_timeout_s)
+            while rclpy.ok():
+                age_s = axis.last_heartbeat_age_s()
+                if age_s is not None and age_s <= float(self.can_heartbeat_timeout_s):
+                    break
+                if _now_monotonic_s() >= heartbeat_deadline_s:
+                    self.get_logger().warning(
+                        "No ODrive heartbeat received yet; verify CAN wiring/bitrate/node_id and that ODrive CAN is enabled"
+                    )
+                    heartbeat_deadline_s = _now_monotonic_s() + float(self.can_heartbeat_timeout_s)
+                await asyncio.sleep(0.1)
+
+            if self.can_enable_closed_loop_on_start:
+                self.get_logger().info(f"Enabling closed-loop control on ODrive (node_id={self.can_node_id})")
+                axis.set_axis_state(axis.AXIS_STATE_CLOSED_LOOP_CONTROL)
+                self.get_logger().info("Closed-loop control command sent")
+
+            poll_period = 1.0 / float(self.can_poll_hz) if self.can_poll_hz else 0.02
+            try:
+                while rclpy.ok():
+                    axis.request_encoder_estimates()
+                    if self.can_request_iq:
+                        axis.request_iq()
+                    await asyncio.sleep(poll_period)
+            finally:
+                axis.shutdown()
+            return
+
+        try:
+            import odrive  # type: ignore
+            from odrive.enums import AxisState, ControlMode, InputMode  # type: ignore
         except ImportError:
-            node.get_logger().error("CAN transport selected but `python-can` is not installed")
+            self.get_logger().error("The 'odrive' python package is not installed; cannot control hardware")
+            # Keep the coroutine alive so ROS subscriptions continue working
             while rclpy.ok():
                 await asyncio.sleep(1.0)
             return
-        except Exception as exc:
-            node.get_logger().error(f"Failed to open CAN interface {node.can_interface}:{node.can_channel}: {exc}")
-            return
 
-        if not node.joint_id:
-            node.get_logger().error("No joint_id configured; cannot register ODrive axis")
-            axis.shutdown()
-            return
-
-        node.register_axis(node.joint_id, axis)
-        node.get_logger().info(
-            f"Connected to ODrive CANSimple (node_id={node.can_node_id}, {node.can_interface}:{node.can_channel}), bitrate={node.can_bitrate}"
-        )
-
-        if node.control_mode == "velocity":
-            axis.set_controller_mode(axis.CONTROL_MODE_VELOCITY_CONTROL, axis.INPUT_MODE_PASSTHROUGH)
-        elif node.control_mode == "torque":
-            axis.set_controller_mode(axis.CONTROL_MODE_TORQUE_CONTROL, axis.INPUT_MODE_PASSTHROUGH)
-        else:
-            axis.set_controller_mode(axis.CONTROL_MODE_POSITION_CONTROL, axis.INPUT_MODE_PASSTHROUGH)
-
-        heartbeat_deadline_s = _now_monotonic_s() + float(node.can_heartbeat_timeout_s)
-        while rclpy.ok():
-            age_s = axis.last_heartbeat_age_s()
-            if age_s is not None and age_s <= float(node.can_heartbeat_timeout_s):
-                break
-            if _now_monotonic_s() >= heartbeat_deadline_s:
-                node.get_logger().warning(
-                    "No ODrive heartbeat received yet; verify CAN wiring/bitrate/node_id and that ODrive CAN is enabled"
-                )
-                heartbeat_deadline_s = _now_monotonic_s() + float(node.can_heartbeat_timeout_s)
-            await asyncio.sleep(0.1)
-
-        if node.can_enable_closed_loop_on_start:
-            node.get_logger().info(f"Enabling closed-loop control on ODrive (node_id={node.can_node_id})")
-            axis.set_axis_state(axis.AXIS_STATE_CLOSED_LOOP_CONTROL)
-            node.get_logger().info("Closed-loop control command sent")
-
-        poll_period = 1.0 / float(node.can_poll_hz) if node.can_poll_hz else 0.02
+        loop = asyncio.get_event_loop()
+        self.get_logger().info("Searching for any ODrive S1...")
         try:
-            while rclpy.ok():
-                axis.request_encoder_estimates()
-                if node.can_request_iq:
-                    axis.request_iq()
-                await asyncio.sleep(poll_period)
-        finally:
-            axis.shutdown()
-        return
+            odrv = await loop.run_in_executor(None, odrive.find_any)
+        except Exception as exc:
+            self.get_logger().error(f"Failed to find ODrive device: {exc}")
+            return
 
-    try:
-        import odrive  # type: ignore
-        from odrive.enums import AxisState, ControlMode, InputMode  # type: ignore
-    except ImportError:
-        node.get_logger().error("The 'odrive' python package is not installed; cannot control hardware")
-        # Keep the coroutine alive so ROS subscriptions continue working
+        if odrv is None:
+            self.get_logger().error("No ODrive device found")
+            return
+
+        self.get_logger().info(f"Connected to ODrive: {odrv.serial_number}")
+
+        if not self.joint_id:
+            self.get_logger().error("No joint_id configured; cannot register ODrive axis")
+            return
+
+        available_axes = [getattr(odrv, f"axis{i}") for i in range(2) if hasattr(odrv, f"axis{i}")]
+        if not available_axes:
+            self.get_logger().error("No axes found on connected ODrive")
+            return
+
+        axis = available_axes[0]
+        self.register_axis(self.joint_id, axis)
+        # Configure control mode and enable closed-loop
+        if self.control_mode == "velocity":
+            axis.controller.config.control_mode = ControlMode.VELOCITY_CONTROL
+            axis.controller.config.input_mode = InputMode.PASSTHROUGH
+        elif self.control_mode == "torque":
+            axis.controller.config.control_mode = ControlMode.TORQUE_CONTROL
+            axis.controller.config.input_mode = InputMode.PASSTHROUGH
+        else:
+            axis.controller.config.control_mode = ControlMode.POSITION_CONTROL
+            axis.controller.config.input_mode = InputMode.PASSTHROUGH
+        axis.requested_state = AxisState.CLOSED_LOOP_CONTROL
+        self.get_logger().info(f"Joint {self.joint_id} registered to axis0 in mode={self.control_mode}")
+
         while rclpy.ok():
-            await asyncio.sleep(1.0)
-        return
-
-    loop = asyncio.get_event_loop()
-    node.get_logger().info("Searching for any ODrive S1...")
-    try:
-        odrv = await loop.run_in_executor(None, odrive.find_any)
-    except Exception as exc:
-        node.get_logger().error(f"Failed to find ODrive device: {exc}")
-        return
-
-    if odrv is None:
-        node.get_logger().error("No ODrive device found")
-        return
-
-    node.get_logger().info(f"Connected to ODrive: {odrv.serial_number}")
-
-    if not node.joint_id:
-        node.get_logger().error("No joint_id configured; cannot register ODrive axis")
-        return
-
-    available_axes = [getattr(odrv, f"axis{i}") for i in range(2) if hasattr(odrv, f"axis{i}")]
-    if not available_axes:
-        node.get_logger().error("No axes found on connected ODrive")
-        return
-
-    axis = available_axes[0]
-    node.register_axis(node.joint_id, axis)
-    # Configure control mode and enable closed-loop
-    if node.control_mode == "velocity":
-        axis.controller.config.control_mode = ControlMode.VELOCITY_CONTROL
-        axis.controller.config.input_mode = InputMode.PASSTHROUGH
-    elif node.control_mode == "torque":
-        axis.controller.config.control_mode = ControlMode.TORQUE_CONTROL
-        axis.controller.config.input_mode = InputMode.PASSTHROUGH
-    else:
-        axis.controller.config.control_mode = ControlMode.POSITION_CONTROL
-        axis.controller.config.input_mode = InputMode.PASSTHROUGH
-    axis.requested_state = AxisState.CLOSED_LOOP_CONTROL
-    node.get_logger().info(f"Joint {node.joint_id} registered to axis0 in mode={node.control_mode}")
-
-    while rclpy.ok():
-        await asyncio.sleep(0.05)
+            await asyncio.sleep(0.05)
 
 
 def main(args=None):
-    try:
-        print("NODE AMENT_PREFIX_PATH:", os.environ.get("AMENT_PREFIX_PATH", "<none>"), flush=True)
-        rclpy.init(args=args)
-        node = ODriveS1Controller()
-
-        # Spin ROS in the background so subscriptions/timers actually run
-        executor = SingleThreadedExecutor()
-        executor.add_node(node)
-        ros_thread = threading.Thread(target=executor.spin, daemon=True)
-        ros_thread.start()
-        node.get_logger().info("ROS executor started (background thread)")
-
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            node.get_logger().info("Attempting to run ODrive S1 Controller…")
-            loop.run_until_complete(run_odrive(node))
-        except KeyboardInterrupt:
-            node.get_logger().info("Keyboard interrupt received")
-        except Exception as e:
-            node.get_logger().error(f"ODrive loop crashed: {e}")
-        finally:
-            node.get_logger().info("Shutting down")
-            executor.shutdown()
-            loop.stop()
-            loop.close()
-            node.destroy_node()
-            rclpy.shutdown()
-    except Exception as e:
-        print("=== ODRIVE_S1 NODE CRASH ===", file=sys.stderr, flush=True)
-        traceback.print_exc()
-        raise
+    """Main entry point for the ODrive S1 node, using the PolyflowNode runner."""
+    ODriveS1Controller.main(args=args)
 
 
 if __name__ == "__main__":
