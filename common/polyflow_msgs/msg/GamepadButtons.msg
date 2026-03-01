@@ -1,0 +1,9 @@
+bool a
+bool b
+bool x
+bool y
+bool lb
+bool rb
+bool start
+bool select
+bool connected

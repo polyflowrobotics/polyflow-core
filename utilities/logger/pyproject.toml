@@ -1,0 +1,25 @@
+[tool.pdm.build]
+includes = [
+    "logger",
+]
+
+[project]
+authors = [
+    {name = "Drew Swinney", email = "drew@polyflowrobotics.com"},
+]
+maintainers = [
+    {name = "Drew Swinney", email = "drew@polyflowrobotics.com"},
+]
+requires-python = ""
+dependencies = []
+name = "logger"
+version = "0.1.0"
+description = "Polyflow logger utility node"
+license = {text = "MIT"}
+
+[project.scripts]
+logger_node = "logger.node:main"
+
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"

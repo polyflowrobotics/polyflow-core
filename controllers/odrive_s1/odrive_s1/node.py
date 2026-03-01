@@ -12,6 +12,7 @@ from typing import Any, Dict, Optional
 
 import rclpy
 from rclpy.executors import SingleThreadedExecutor
+from std_msgs.msg import String
 
 # Assumes 'polyflow-core' is in the PYTHONPATH, allowing `from common...`
 from common.polyflow_node import PolyflowNode
@@ -350,9 +351,10 @@ class ODriveS1Controller(PolyflowNode):
 
         self.axes: Dict[str, Any] = {}
 
-        # The PolyflowNode base class handles all ROS subscriptions and publishers
-        # for graph communication. We only need a timer to periodically publish
-        # the joint state.
+        # Register typed pins (using String for complex JSON protocol)
+        self.register_input_pin("trajectory", String)
+        self.register_output_pin("joint_state", String)
+
         rate_hz = self.configuration.get("rate_hz", 50)
         period = 1.0 / rate_hz if rate_hz else 0.02
         self.joint_state_timer = self.create_timer(period, self._publish_joint_state)
@@ -395,7 +397,7 @@ class ODriveS1Controller(PolyflowNode):
             except Exception as exc:  # Hardware config errors should not crash the node
                 self.get_logger().warning(f"Failed to set velocity limit on {joint_id}: {exc}")
 
-    def process_input(self, pin_id: str, data: Any):
+    def process_input(self, pin_id: str, msg: Any):
         """
         Handles incoming trajectory commands from the Polyflow graph.
         This method is called by the PolyflowNode base class.
@@ -403,9 +405,14 @@ class ODriveS1Controller(PolyflowNode):
         if not self.should_run(trigger_info={'pin_id': pin_id}):
             return
 
-        # The input pin for trajectory commands.
         if pin_id != "trajectory":
             self.get_logger().debug(f"Ignoring input on unhandled pin '{pin_id}'")
+            return
+
+        try:
+            data = json.loads(msg.data)
+        except (json.JSONDecodeError, AttributeError):
+            self.get_logger().warn("Trajectory payload must be a JSON string")
             return
 
         self.get_logger().info(
@@ -517,7 +524,9 @@ class ODriveS1Controller(PolyflowNode):
                     "effort": [effort if effort is not None else 0.0],
                     "timestamp": time.time()
                 }
-                self.publish_to_pin(output_pin_id, payload)
+                str_msg = String()
+                str_msg.data = json.dumps(payload)
+                self.publish_to_pin(output_pin_id, str_msg)
 
             except Exception as exc:
                 self.get_logger().warning(f"Failed to read state for {joint_id}: {exc}")

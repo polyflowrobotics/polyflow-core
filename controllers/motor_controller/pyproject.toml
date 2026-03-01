@@ -1,0 +1,25 @@
+[tool.pdm.build]
+includes = [
+    "motor_controller",
+]
+
+[project]
+authors = [
+    {name = "Drew Swinney", email = "drew@polyflowrobotics.com"},
+]
+maintainers = [
+    {name = "Drew Swinney", email = "drew@polyflowrobotics.com"},
+]
+requires-python = ""
+dependencies = []
+name = "motor_controller"
+version = "0.1.0"
+description = "Generic Polyflow motor controller node"
+license = {text = "MIT"}
+
+[project.scripts]
+motor_controller_node = "motor_controller.node:main"
+
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"

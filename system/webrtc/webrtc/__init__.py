@@ -1,1 +1,0 @@
-# This is here as a placeholder to make the webrtc node run

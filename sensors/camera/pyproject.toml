@@ -1,0 +1,25 @@
+[tool.pdm.build]
+includes = [
+    "camera",
+]
+
+[project]
+authors = [
+    {name = "Drew Swinney", email = "drew@polyflowrobotics.com"},
+]
+maintainers = [
+    {name = "Drew Swinney", email = "drew@polyflowrobotics.com"},
+]
+requires-python = ""
+dependencies = []
+name = "camera"
+version = "0.1.0"
+description = "Polyflow camera sensor node"
+license = {text = "MIT"}
+
+[project.scripts]
+camera_node = "camera.node:main"
+
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"

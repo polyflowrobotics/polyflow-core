@@ -1,0 +1,25 @@
+[tool.pdm.build]
+includes = [
+    "differential_drive",
+]
+
+[project]
+authors = [
+    {name = "Drew Swinney", email = "drew@polyflowrobotics.com"},
+]
+maintainers = [
+    {name = "Drew Swinney", email = "drew@polyflowrobotics.com"},
+]
+requires-python = ""
+dependencies = []
+name = "differential_drive"
+version = "0.1.0"
+description = "Polyflow differential drive orchestrator node"
+license = {text = "MIT"}
+
+[project.scripts]
+differential_drive_node = "differential_drive.node:main"
+
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"
