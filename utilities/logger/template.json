@@ -1,0 +1,31 @@
+{
+  "type": "utility",
+  "name": "Logger",
+  "entry_point": "logger/node.py",
+  "topics": [
+    {
+      "name": "log",
+      "direction": "subscribe",
+      "msg_type": "polyflow_msgs/LogEntry"
+    }
+  ],
+  "services": [],
+  "actions": [],
+  "parameters_schema": {
+    "log_file": {
+      "label": "Log File Path",
+      "type": "string",
+      "default": "",
+      "description": "Path to the log file. Leave empty for stdout only.",
+      "ui": { "group": "Logger", "order": 1 }
+    },
+    "log_to_stdout": {
+      "label": "Log to Stdout",
+      "type": "boolean",
+      "default": true,
+      "description": "Whether to also print log entries to stdout.",
+      "ui": { "group": "Logger", "order": 2 }
+    }
+  },
+  "defaults": {}
+}

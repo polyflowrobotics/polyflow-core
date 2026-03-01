@@ -1,0 +1,80 @@
+{
+  "type": "orchestrator",
+  "name": "Differential Drive",
+  "entry_point": "differential_drive/node.py",
+  "topics": [
+    {
+      "name": "cmd_vel",
+      "direction": "subscribe",
+      "msg_type": "geometry_msgs/Twist"
+    },
+    {
+      "name": "mode",
+      "direction": "subscribe",
+      "msg_type": "polyflow_msgs/ModeState"
+    },
+    {
+      "name": "encoder_left",
+      "direction": "subscribe",
+      "msg_type": "polyflow_msgs/EncoderState"
+    },
+    {
+      "name": "encoder_right",
+      "direction": "subscribe",
+      "msg_type": "polyflow_msgs/EncoderState"
+    },
+    {
+      "name": "front_left_motor",
+      "direction": "publish",
+      "msg_type": "std_msgs/Float64"
+    },
+    {
+      "name": "rear_left_motor",
+      "direction": "publish",
+      "msg_type": "std_msgs/Float64"
+    },
+    {
+      "name": "front_right_motor",
+      "direction": "publish",
+      "msg_type": "std_msgs/Float64"
+    },
+    {
+      "name": "rear_right_motor",
+      "direction": "publish",
+      "msg_type": "std_msgs/Float64"
+    },
+    {
+      "name": "odometry",
+      "direction": "publish",
+      "msg_type": "nav_msgs/Odometry"
+    }
+  ],
+  "services": [],
+  "actions": [],
+  "parameters_schema": {
+    "wheel_radius": {
+      "label": "Wheel Radius (m)",
+      "type": "number",
+      "default": 0.05,
+      "description": "Wheel radius in meters.",
+      "ui": { "group": "Kinematics", "order": 1 }
+    },
+    "wheel_separation": {
+      "label": "Wheel Separation (m)",
+      "type": "number",
+      "default": 0.3,
+      "description": "Distance between left and right wheels in meters.",
+      "ui": { "group": "Kinematics", "order": 2 }
+    },
+    "max_wheel_speed": {
+      "label": "Max Wheel Speed (m/s)",
+      "type": "number",
+      "default": 1.0,
+      "description": "Maximum wheel speed in m/s.",
+      "ui": { "group": "Kinematics", "order": 3 }
+    }
+  },
+  "defaults": {
+    "rate_hz": 50
+  }
+}

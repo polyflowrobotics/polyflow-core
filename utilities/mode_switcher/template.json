@@ -1,0 +1,37 @@
+{
+  "type": "utility",
+  "name": "Mode Switcher",
+  "entry_point": "mode_switcher/node.py",
+  "topics": [
+    {
+      "name": "set_mode",
+      "direction": "subscribe",
+      "msg_type": "polyflow_msgs/ModeCommand"
+    },
+    {
+      "name": "mode",
+      "direction": "publish",
+      "msg_type": "polyflow_msgs/ModeState"
+    }
+  ],
+  "services": [],
+  "actions": [],
+  "parameters_schema": {
+    "default_mode": {
+      "label": "Default Mode",
+      "type": "enum",
+      "values": ["teleop", "automated", "stopped"],
+      "default": "stopped",
+      "description": "Starting operating mode.",
+      "ui": { "group": "Mode", "order": 1 }
+    },
+    "allowed_modes": {
+      "label": "Allowed Modes",
+      "type": "array",
+      "default": ["teleop", "automated", "stopped"],
+      "description": "List of valid operating modes.",
+      "ui": { "group": "Mode", "order": 2 }
+    }
+  },
+  "defaults": {}
+}

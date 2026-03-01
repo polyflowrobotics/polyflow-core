@@ -1,0 +1,64 @@
+{
+  "type": "input",
+  "name": "Gamepad",
+  "entry_point": "gamepad/node.py",
+  "topics": [
+    {
+      "name": "axes",
+      "direction": "publish",
+      "msg_type": "polyflow_msgs/GamepadAxes"
+    },
+    {
+      "name": "buttons",
+      "direction": "publish",
+      "msg_type": "polyflow_msgs/GamepadButtons"
+    },
+    {
+      "name": "cmd_vel",
+      "direction": "publish",
+      "msg_type": "geometry_msgs/Twist"
+    }
+  ],
+  "services": [],
+  "actions": [],
+  "parameters_schema": {
+    "device_index": {
+      "label": "Device Index",
+      "type": "number",
+      "default": 0,
+      "description": "Gamepad device index.",
+      "ui": { "group": "Gamepad", "order": 1 }
+    },
+    "poll_rate_hz": {
+      "label": "Poll Rate (Hz)",
+      "type": "number",
+      "default": 60,
+      "description": "How often to poll the gamepad.",
+      "ui": { "group": "Gamepad", "order": 2 }
+    },
+    "deadzone": {
+      "label": "Deadzone",
+      "type": "number",
+      "default": 0.05,
+      "description": "Axis deadzone threshold.",
+      "ui": { "group": "Gamepad", "order": 3 }
+    },
+    "max_linear_speed": {
+      "label": "Max Linear Speed (m/s)",
+      "type": "number",
+      "default": 1.0,
+      "description": "Maximum forward/backward speed for cmd_vel output.",
+      "ui": { "group": "Velocity", "order": 1 }
+    },
+    "max_angular_speed": {
+      "label": "Max Angular Speed (rad/s)",
+      "type": "number",
+      "default": 2.0,
+      "description": "Maximum turning rate for cmd_vel output.",
+      "ui": { "group": "Velocity", "order": 2 }
+    }
+  },
+  "defaults": {
+    "rate_hz": 60
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "type": "sensor",
+  "name": "Optical Encoder",
+  "entry_point": "optical_encoder/node.py",
+  "topics": [
+    {
+      "name": "reset",
+      "direction": "subscribe",
+      "msg_type": "std_msgs/Empty"
+    },
+    {
+      "name": "encoder_state",
+      "direction": "publish",
+      "msg_type": "polyflow_msgs/EncoderState"
+    }
+  ],
+  "services": [],
+  "actions": [],
+  "parameters_schema": {
+    "encoder_id": {
+      "label": "Encoder ID",
+      "type": "string",
+      "default": "encoder_0",
+      "description": "Identifier for this encoder.",
+      "ui": { "group": "Encoder", "order": 1 }
+    },
+    "ticks_per_rev": {
+      "label": "Ticks Per Revolution",
+      "type": "number",
+      "default": 1024,
+      "description": "Encoder resolution in ticks per revolution.",
+      "ui": { "group": "Encoder", "order": 2 }
+    },
+    "publish_rate_hz": {
+      "label": "Publish Rate (Hz)",
+      "type": "number",
+      "default": 50,
+      "description": "How often to publish encoder state.",
+      "ui": { "group": "Encoder", "order": 3 }
+    }
+  },
+  "defaults": {
+    "rate_hz": 50
+  }
+}

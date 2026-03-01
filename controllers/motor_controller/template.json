@@ -1,0 +1,45 @@
+{
+  "type": "controller",
+  "name": "Motor Controller",
+  "entry_point": "motor_controller/node.py",
+  "topics": [
+    {
+      "name": "command",
+      "direction": "subscribe",
+      "msg_type": "std_msgs/Float64"
+    },
+    {
+      "name": "state",
+      "direction": "publish",
+      "msg_type": "polyflow_msgs/MotorState"
+    }
+  ],
+  "services": [],
+  "actions": [],
+  "parameters_schema": {
+    "motor_id": {
+      "label": "Motor ID",
+      "type": "string",
+      "default": "motor_0",
+      "description": "Identifier for the motor being controlled.",
+      "ui": { "group": "Motor", "order": 1 }
+    },
+    "control_mode": {
+      "label": "Control Mode",
+      "type": "enum",
+      "values": ["velocity", "position"],
+      "default": "velocity",
+      "ui": { "group": "Motor", "order": 2 }
+    },
+    "max_speed": {
+      "label": "Max Speed",
+      "type": "number",
+      "default": 1.0,
+      "description": "Maximum allowable speed value.",
+      "ui": { "group": "Motor", "order": 3 }
+    }
+  },
+  "defaults": {
+    "rate_hz": 50
+  }
+}

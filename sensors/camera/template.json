@@ -1,0 +1,57 @@
+{
+  "type": "sensor",
+  "name": "Camera",
+  "entry_point": "camera/node.py",
+  "topics": [
+    {
+      "name": "capture",
+      "direction": "subscribe",
+      "msg_type": "std_msgs/Empty"
+    },
+    {
+      "name": "frame",
+      "direction": "publish",
+      "msg_type": "polyflow_msgs/CameraFrame"
+    }
+  ],
+  "services": [],
+  "actions": [],
+  "parameters_schema": {
+    "camera_id": {
+      "label": "Camera ID",
+      "type": "string",
+      "default": "camera_0",
+      "description": "Identifier for this camera.",
+      "ui": { "group": "Camera", "order": 1 }
+    },
+    "device_index": {
+      "label": "Device Index",
+      "type": "number",
+      "default": 0,
+      "description": "Camera device index.",
+      "ui": { "group": "Camera", "order": 2 }
+    },
+    "width": {
+      "label": "Width (px)",
+      "type": "number",
+      "default": 640,
+      "ui": { "group": "Resolution", "order": 1 }
+    },
+    "height": {
+      "label": "Height (px)",
+      "type": "number",
+      "default": 480,
+      "ui": { "group": "Resolution", "order": 2 }
+    },
+    "fps": {
+      "label": "FPS",
+      "type": "number",
+      "default": 30,
+      "description": "Capture frame rate.",
+      "ui": { "group": "Resolution", "order": 3 }
+    }
+  },
+  "defaults": {
+    "rate_hz": 30
+  }
+}
