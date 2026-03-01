@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>mission_runner</name>
+  <version>0.0.1</version>
+  <description>Mission runner orchestrator node for Polyflow robots</description>
+
+  <maintainer email="drew@polyflowrobotics.com">Drew Swinney</maintainer>
+
+  <buildtool_depend>ament_python</buildtool_depend>
+
+  <depend>rclpy</depend>
+  <depend>std_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>polyflow_msgs</depend>
+
+  <exec_depend>ros2launch</exec_depend>
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+  <exec_depend>ament_index_python</exec_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

@@ -1,0 +1,43 @@
+{
+  "type": "orchestrator",
+  "name": "Mission Runner",
+  "entry_point": "mission_runner/node.py",
+  "topics": [
+    {
+      "name": "mission",
+      "direction": "subscribe",
+      "msg_type": "std_msgs/String"
+    },
+    {
+      "name": "cmd_vel",
+      "direction": "publish",
+      "msg_type": "geometry_msgs/Twist"
+    },
+    {
+      "name": "status",
+      "direction": "publish",
+      "msg_type": "std_msgs/String"
+    }
+  ],
+  "services": [],
+  "actions": [],
+  "parameters_schema": {
+    "linear_speed": {
+      "label": "Linear Speed (m/s)",
+      "type": "number",
+      "default": 0.5,
+      "description": "Speed in m/s for forward and backward commands.",
+      "ui": { "group": "Speeds", "order": 1 }
+    },
+    "angular_speed": {
+      "label": "Angular Speed (rad/s)",
+      "type": "number",
+      "default": 1.0,
+      "description": "Rotation speed in rad/s for turn commands.",
+      "ui": { "group": "Speeds", "order": 2 }
+    }
+  },
+  "defaults": {
+    "rate_hz": 10
+  }
+}

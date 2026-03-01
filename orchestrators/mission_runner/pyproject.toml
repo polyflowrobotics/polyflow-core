@@ -1,0 +1,25 @@
+[tool.pdm.build]
+includes = [
+    "mission_runner",
+]
+
+[project]
+authors = [
+    {name = "Drew Swinney", email = "drew@polyflowrobotics.com"},
+]
+maintainers = [
+    {name = "Drew Swinney", email = "drew@polyflowrobotics.com"},
+]
+requires-python = ""
+dependencies = []
+name = "mission_runner"
+version = "0.1.0"
+description = "Polyflow mission runner orchestrator node"
+license = {text = "MIT"}
+
+[project.scripts]
+mission_runner_node = "mission_runner.node:main"
+
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"
