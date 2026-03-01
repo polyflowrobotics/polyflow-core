@@ -82,6 +82,9 @@ class PolyflowNode(Node):
         self.status_publisher = self.create_publisher(String, '/ros/graph/node_status', 10)
         self.status_timer = self.create_timer(1.0, self._publish_status)
 
+        # --- Logging (system-level topic, not a pin) ---
+        self._log_publisher = None  # Lazy-initialized on first self.log() call
+
     def register_output_pin(self, pin_id: str, msg_type: type, queue_size: int = 10):
         """
         Register a typed output pin. Creates a ROS publisher on /graph/{node_id}/{pin_id}.
@@ -278,6 +281,27 @@ class PolyflowNode(Node):
 
         publisher.publish(msg)
         self.get_logger().debug(f"Published on pin '{pin_id}'")
+
+    def log(self, message: str):
+        """
+        Publish a log entry to the shared /graph/log system topic.
+
+        This is picked up by the Logger utility node (if present) without
+        requiring explicit pin wiring.
+
+        Args:
+            message: The log message string.
+        """
+        if self._log_publisher is None:
+            from polyflow_msgs.msg import LogEntry
+            self._log_publisher = self.create_publisher(LogEntry, '/graph/log', 10)
+            self._log_entry_cls = LogEntry
+
+        entry = self._log_entry_cls()
+        entry.pin_id = self.node_id
+        entry.data = message
+        entry.timestamp = time.time()
+        self._log_publisher.publish(entry)
 
     def should_run(self, trigger_info: Optional[Dict[str, Any]] = None) -> bool:
         """

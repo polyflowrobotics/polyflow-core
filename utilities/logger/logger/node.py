@@ -10,8 +10,9 @@ class LoggerNode(PolyflowNode):
     """
     Logger utility node.
 
-    Receives data on the "log" input pin (LogEntry) and writes it to a log file
-    and/or stdout. Useful for debugging and recording graph data.
+    Subscribes to the system-level /graph/log topic (published by any node
+    via self.log()) and writes entries to a log file and/or stdout.
+    No pin wiring required — all nodes can log without explicit connections.
 
     Parameters (via POLYFLOW_PARAMETERS):
         log_file:           Path to the log file (default: None, stdout only).
@@ -27,31 +28,33 @@ class LoggerNode(PolyflowNode):
         self._file_handle = None
         self._message_count = 0
 
-        self.register_input_pin("log", LogEntry)
+        # Subscribe to the shared system log topic (not a pin)
+        self.create_subscription(
+            LogEntry,
+            '/graph/log',
+            self._on_log_entry,
+            10
+        )
 
         self.get_logger().info(
             f"Logger | file={self.log_file or 'stdout only'} | stdout={self.log_to_stdout}"
         )
 
-    def process_input(self, pin_id: str, data):
-        if not self.should_run(trigger_info={"pin_id": pin_id}):
-            return
+    def _on_log_entry(self, msg: LogEntry):
+        entry = {
+            "node_id": msg.pin_id,
+            "data": msg.data,
+            "timestamp": msg.timestamp,
+        }
+        entry_str = json.dumps(entry)
+        self._message_count += 1
 
-        if pin_id == "log":
-            entry = {
-                "pin_id": data.pin_id,
-                "data": data.data,
-                "timestamp": data.timestamp,
-            }
-            entry_str = json.dumps(entry)
-            self._message_count += 1
+        if self.log_to_stdout:
+            self.get_logger().info(f"[LOG] {entry_str}")
 
-            if self.log_to_stdout:
-                self.get_logger().info(f"[LOG] {entry_str}")
-
-            if self._file_handle:
-                self._file_handle.write(entry_str + "\n")
-                self._file_handle.flush()
+        if self._file_handle:
+            self._file_handle.write(entry_str + "\n")
+            self._file_handle.flush()
 
     async def run_async(self):
         if self.log_file:

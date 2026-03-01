@@ -2,13 +2,7 @@
   "type": "utility",
   "name": "Logger",
   "entry_point": "logger/node.py",
-  "topics": [
-    {
-      "name": "log",
-      "direction": "subscribe",
-      "msg_type": "polyflow_msgs/LogEntry"
-    }
-  ],
+  "topics": [],
   "services": [],
   "actions": [],
   "parameters_schema": {
