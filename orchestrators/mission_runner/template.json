@@ -4,11 +4,6 @@
   "entry_point": "mission_runner/node.py",
   "topics": [
     {
-      "name": "mission",
-      "direction": "subscribe",
-      "msg_type": "std_msgs/String"
-    },
-    {
       "name": "cmd_vel",
       "direction": "publish",
       "msg_type": "geometry_msgs/Twist"
@@ -22,6 +17,13 @@
   "services": [],
   "actions": [],
   "parameters_schema": {
+    "mission": {
+      "label": "Mission",
+      "type": "json",
+      "default": [],
+      "description": "Ordered list of steps. Each step: {\"command\": \"forward|backward|turn_left|turn_right|stop\", \"duration\": seconds}.",
+      "ui": { "group": "Mission", "order": 0 }
+    },
     "linear_speed": {
       "label": "Linear Speed (m/s)",
       "type": "number",
