@@ -5,6 +5,7 @@
   <description>Mode switcher orchestrator node for Polyflow robots</description>
 
   <maintainer email="drew@polyflowrobotics.com">Drew Swinney</maintainer>
+  <license>MIT</license>
 
   <buildtool_depend>ament_python</buildtool_depend>
 
