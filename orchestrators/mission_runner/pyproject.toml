@@ -9,6 +9,7 @@ authors = [
 maintainers = [
     {name = "Drew Swinney", email = "drew@polyflowrobotics.com"},
 ]
+requires-python = ">=3.12"
 dependencies = ["setuptools"]
 
 [tool.setuptools.packages.find]
