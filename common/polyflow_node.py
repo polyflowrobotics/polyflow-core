@@ -34,8 +34,11 @@ class PolyflowNode(Node):
         if not self.node_id:
             raise ValueError("POLYFLOW_NODE_ID environment variable not set.")
 
-        # Sanitize node_id to be a valid ROS node name (ROS node names cannot contain hyphens)
+        # Sanitize node_id to be a valid ROS node name
+        # (no hyphens, must not start with a number)
         node_name = self.node_id.replace('-', '_')
+        if node_name[0].isdigit():
+            node_name = f"n{node_name}"
         super().__init__(node_name)
 
         # --- Load Parameters & Configuration ---
