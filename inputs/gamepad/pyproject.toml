@@ -1,25 +1,26 @@
-[tool.pdm.build]
-includes = [
-    "gamepad",
-]
-
 [project]
+name = "gamepad"
+version = "0.1.0"
+description = "Polyflow gamepad teleop input node"
+license = "MIT"
 authors = [
     {name = "Drew Swinney", email = "drew@polyflowrobotics.com"},
 ]
 maintainers = [
     {name = "Drew Swinney", email = "drew@polyflowrobotics.com"},
 ]
-requires-python = ""
-dependencies = []
-name = "gamepad"
-version = "0.1.0"
-description = "Polyflow gamepad teleop input node"
-license = {text = "MIT"}
+dependencies = ["setuptools"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+
+[tool.setuptools.data-files]
+"share/ament_index/resource_index/packages" = ["resource/gamepad"]
+"share/gamepad" = ["package.xml"]
 
 [project.scripts]
 gamepad_node = "gamepad.node:main"
 
 [build-system]
-requires = ["pdm-backend"]
-build-backend = "pdm.backend"
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"

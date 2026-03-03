@@ -1,25 +1,26 @@
-[tool.pdm.build]
-includes = [
-    "mission_runner",
-]
-
 [project]
+name = "mission_runner"
+version = "0.1.0"
+description = "Polyflow mission runner orchestrator node"
+license = "MIT"
 authors = [
     {name = "Drew Swinney", email = "drew@polyflowrobotics.com"},
 ]
 maintainers = [
     {name = "Drew Swinney", email = "drew@polyflowrobotics.com"},
 ]
-requires-python = ""
-dependencies = []
-name = "mission_runner"
-version = "0.1.0"
-description = "Polyflow mission runner orchestrator node"
-license = {text = "MIT"}
+dependencies = ["setuptools"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+
+[tool.setuptools.data-files]
+"share/ament_index/resource_index/packages" = ["resource/mission_runner"]
+"share/mission_runner" = ["package.xml"]
 
 [project.scripts]
 mission_runner_node = "mission_runner.node:main"
 
 [build-system]
-requires = ["pdm-backend"]
-build-backend = "pdm.backend"
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"

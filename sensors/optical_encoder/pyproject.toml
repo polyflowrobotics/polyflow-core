@@ -1,25 +1,26 @@
-[tool.pdm.build]
-includes = [
-    "optical_encoder",
-]
-
 [project]
+name = "optical_encoder"
+version = "0.1.0"
+description = "Polyflow optical encoder sensor node"
+license = "MIT"
 authors = [
     {name = "Drew Swinney", email = "drew@polyflowrobotics.com"},
 ]
 maintainers = [
     {name = "Drew Swinney", email = "drew@polyflowrobotics.com"},
 ]
-requires-python = ""
-dependencies = []
-name = "optical_encoder"
-version = "0.1.0"
-description = "Polyflow optical encoder sensor node"
-license = {text = "MIT"}
+dependencies = ["setuptools"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+
+[tool.setuptools.data-files]
+"share/ament_index/resource_index/packages" = ["resource/optical_encoder"]
+"share/optical_encoder" = ["package.xml"]
 
 [project.scripts]
 optical_encoder_node = "optical_encoder.node:main"
 
 [build-system]
-requires = ["pdm-backend"]
-build-backend = "pdm.backend"
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"

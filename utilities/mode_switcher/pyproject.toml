@@ -1,25 +1,26 @@
-[tool.pdm.build]
-includes = [
-    "mode_switcher",
-]
-
 [project]
+name = "mode_switcher"
+version = "0.1.0"
+description = "Polyflow mode switcher orchestrator node"
+license = "MIT"
 authors = [
     {name = "Drew Swinney", email = "drew@polyflowrobotics.com"},
 ]
 maintainers = [
     {name = "Drew Swinney", email = "drew@polyflowrobotics.com"},
 ]
-requires-python = ""
-dependencies = []
-name = "mode_switcher"
-version = "0.1.0"
-description = "Polyflow mode switcher orchestrator node"
-license = {text = "MIT"}
+dependencies = ["setuptools"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+
+[tool.setuptools.data-files]
+"share/ament_index/resource_index/packages" = ["resource/mode_switcher"]
+"share/mode_switcher" = ["package.xml"]
 
 [project.scripts]
 mode_switcher_node = "mode_switcher.node:main"
 
 [build-system]
-requires = ["pdm-backend"]
-build-backend = "pdm.backend"
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
