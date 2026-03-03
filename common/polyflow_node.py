@@ -34,12 +34,12 @@ class PolyflowNode(Node):
         if not self.node_id:
             raise ValueError("POLYFLOW_NODE_ID environment variable not set.")
 
-        # Sanitize node_id to be a valid ROS node name
+        # Sanitize node_id for use in ROS node names and topic paths
         # (no hyphens, must not start with a number)
-        node_name = self.node_id.replace('-', '_')
-        if node_name[0].isdigit():
-            node_name = f"n{node_name}"
-        super().__init__(node_name)
+        self.ros_safe_id = self.node_id.replace('-', '_')
+        if self.ros_safe_id[0].isdigit():
+            self.ros_safe_id = f"n{self.ros_safe_id}"
+        super().__init__(self.ros_safe_id)
 
         # --- Load Parameters & Configuration ---
         self.parameters: Dict[str, Any] = self._load_json_env("POLYFLOW_PARAMETERS", {})
@@ -97,7 +97,7 @@ class PolyflowNode(Node):
             msg_type: The ROS message type to publish.
             queue_size: Publisher queue depth (default: 10).
         """
-        topic = f"/graph/{self.node_id}/{pin_id}"
+        topic = f"/graph/{self.ros_safe_id}/{pin_id}"
         self._pin_publishers[pin_id] = self.create_publisher(msg_type, topic, queue_size)
         self._output_pin_types[pin_id] = msg_type
         self.get_logger().info(f"Output pin '{pin_id}' -> {topic} [{msg_type.__name__}]")
@@ -121,7 +121,10 @@ class PolyflowNode(Node):
             if conn.get("target_pin_id") == pin_id:
                 source_node_id = conn.get("source_node_id")
                 source_pin_id = conn.get("source_pin_id")
-                topic = f"/graph/{source_node_id}/{source_pin_id}"
+                safe_source_id = source_node_id.replace('-', '_')
+                if safe_source_id[0].isdigit():
+                    safe_source_id = f"n{safe_source_id}"
+                topic = f"/graph/{safe_source_id}/{source_pin_id}"
 
                 def make_callback(p_id):
                     return lambda msg: self._typed_input_callback(p_id, msg)
