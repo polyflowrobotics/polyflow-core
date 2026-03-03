@@ -20,7 +20,3 @@ where = ["."]
 
 [project.scripts]
 mission_runner_node = "mission_runner.node:main"
-
-[build-system]
-requires = ["setuptools>=61.0"]
-build-backend = "setuptools.build_meta"

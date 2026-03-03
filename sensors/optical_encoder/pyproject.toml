@@ -20,7 +20,3 @@ where = ["."]
 
 [project.scripts]
 optical_encoder_node = "optical_encoder.node:main"
-
-[build-system]
-requires = ["setuptools>=61.0"]
-build-backend = "setuptools.build_meta"

@@ -20,7 +20,3 @@ where = ["."]
 
 [project.scripts]
 mode_switcher_node = "mode_switcher.node:main"
-
-[build-system]
-requires = ["setuptools>=61.0"]
-build-backend = "setuptools.build_meta"

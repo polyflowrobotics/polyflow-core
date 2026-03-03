@@ -20,7 +20,3 @@ where = ["."]
 
 [project.scripts]
 motor_controller_node = "motor_controller.node:main"
-
-[build-system]
-requires = ["setuptools>=61.0"]
-build-backend = "setuptools.build_meta"
