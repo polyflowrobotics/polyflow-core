@@ -12,6 +12,7 @@
   <depend>rclpy</depend>
   <depend>std_msgs</depend>
   <depend>polyflow_msgs</depend>
+  <depend>common</depend>
 
   <exec_depend>ros2launch</exec_depend>
   <exec_depend>launch</exec_depend>
