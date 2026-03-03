@@ -20,3 +20,7 @@ where = ["."]
 
 [project.scripts]
 differential_drive_node = "differential_drive.node:main"
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"

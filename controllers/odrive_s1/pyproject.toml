@@ -25,3 +25,7 @@ where = ["."]
 
 [project.scripts]
 odrive_s1_node = "odrive_s1.node:main"
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
