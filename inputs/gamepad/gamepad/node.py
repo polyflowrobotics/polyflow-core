@@ -3,93 +3,98 @@ import asyncio
 from geometry_msgs.msg import Twist
 from polyflow_msgs.msg import GamepadAxes, GamepadButtons
 from common.polyflow_node import PolyflowNode
+from common.polyflow_kernel import PolyflowKernel
 
 
-class GamepadNode(PolyflowNode):
+class GamepadKernel(PolyflowKernel):
     """
-    Gamepad teleop input node.
+    Portable logic for a gamepad teleop input.
 
-    Polls a connected gamepad/joystick at a configurable rate and publishes
-    axis state on the "axes" output pin (GamepadAxes) and button state on
-    the "buttons" output pin (GamepadButtons).
+    Applies deadzone filtering and converts raw axis values into
+    cmd_vel output. The host wrapper polls the actual gamepad hardware
+    and calls emit_gamepad_state() with raw values.
 
-    Parameters (via POLYFLOW_PARAMETERS):
+    Parameters:
         device_index:       Gamepad device index (default: 0).
         poll_rate_hz:       How often to poll the device (default: 60).
         deadzone:           Axis deadzone threshold (default: 0.05).
-        max_linear_speed:   Max forward/backward speed in m/s for cmd_vel (default: 1.0).
-        max_angular_speed:  Max turning rate in rad/s for cmd_vel (default: 2.0).
+        max_linear_speed:   Max forward/backward speed in m/s (default: 1.0).
+        max_angular_speed:  Max turning rate in rad/s (default: 2.0).
     """
 
-    def __init__(self):
-        super().__init__()
-
+    def setup(self):
         self.device_index = int(self.get_param("device_index", 0))
         self.poll_rate_hz = float(self.get_param("poll_rate_hz", 60.0))
         self.deadzone = float(self.get_param("deadzone", 0.05))
         self.max_linear_speed = float(self.get_param("max_linear_speed", 1.0))
         self.max_angular_speed = float(self.get_param("max_angular_speed", 2.0))
-
         self._connected = False
-
-        self.register_output_pin("axes", GamepadAxes)
-        self.register_output_pin("buttons", GamepadButtons)
-        self.register_output_pin("cmd_vel", Twist)
-
-        self.get_logger().info(
-            f"Gamepad device={self.device_index} | poll_rate={self.poll_rate_hz}Hz | deadzone={self.deadzone}"
-        )
 
     def _apply_deadzone(self, value: float) -> float:
         if abs(value) < self.deadzone:
             return 0.0
         return value
 
-    def process_input(self, pin_id: str, data):
+    def emit_gamepad_state(
+        self,
+        left_x: float = 0.0, left_y: float = 0.0,
+        right_x: float = 0.0, right_y: float = 0.0,
+        buttons: dict = None,
+    ):
+        """Emit axes, buttons, and computed cmd_vel from raw gamepad values."""
+        axes = {
+            "left_x": left_x, "left_y": left_y,
+            "right_x": right_x, "right_y": right_y,
+            "connected": self._connected,
+        }
+        self.emit("axes", axes)
+
+        btn = buttons or {}
+        self.emit("buttons", {
+            "a": btn.get("a", False), "b": btn.get("b", False),
+            "x": btn.get("x", False), "y": btn.get("y", False),
+            "lb": btn.get("lb", False), "rb": btn.get("rb", False),
+            "start": btn.get("start", False), "select": btn.get("select", False),
+            "connected": self._connected,
+        })
+
+        self.emit("cmd_vel", {
+            "linear": {"x": left_y * self.max_linear_speed, "y": 0.0, "z": 0.0},
+            "angular": {"x": 0.0, "y": 0.0, "z": right_x * self.max_angular_speed},
+        })
+
+    def process_input(self, pin_id: str, data: dict):
         pass
+
+
+class GamepadNode(PolyflowNode):
+    """ROS wrapper for GamepadKernel."""
+
+    kernel_class = GamepadKernel
+
+    def __init__(self):
+        super().__init__()
+
+        self.register_output_pin("axes", GamepadAxes)
+        self.register_output_pin("buttons", GamepadButtons)
+        self.register_output_pin("cmd_vel", Twist)
+
+        self.get_logger().info(
+            f"Gamepad device={self.kernel.device_index} | poll_rate={self.kernel.poll_rate_hz}Hz | deadzone={self.kernel.deadzone}"
+        )
 
     async def run_async(self):
         self.get_logger().info("Gamepad starting up...")
 
         # TODO: Initialize gamepad connection here
-        # Example with pygame:
-        #   import pygame
-        #   pygame.joystick.init()
-        #   joystick = pygame.joystick.Joystick(self.device_index)
-        #   joystick.init()
-        self._connected = True
+        self.kernel._connected = True
         self.get_logger().info("Gamepad ready")
 
-        period = 1.0 / self.poll_rate_hz
+        period = 1.0 / self.kernel.poll_rate_hz
         while True:
             if self.should_run():
-                # TODO: Read actual gamepad state here
-
-                axes = GamepadAxes()
-                axes.left_x = 0.0
-                axes.left_y = 0.0
-                axes.right_x = 0.0
-                axes.right_y = 0.0
-                axes.connected = self._connected
-                self.publish_to_pin("axes", axes)
-
-                buttons = GamepadButtons()
-                buttons.a = False
-                buttons.b = False
-                buttons.x = False
-                buttons.y = False
-                buttons.lb = False
-                buttons.rb = False
-                buttons.start = False
-                buttons.select = False
-                buttons.connected = self._connected
-                self.publish_to_pin("buttons", buttons)
-
-                # Publish Twist for direct connection to differential drive
-                twist = Twist()
-                twist.linear.x = axes.left_y * self.max_linear_speed
-                twist.angular.z = axes.right_x * self.max_angular_speed
-                self.publish_to_pin("cmd_vel", twist)
+                # TODO: Read actual gamepad state and pass values
+                self.kernel.emit_gamepad_state()
 
             await asyncio.sleep(period)
 

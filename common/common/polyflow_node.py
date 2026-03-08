@@ -11,6 +11,49 @@ from rclpy.executors import SingleThreadedExecutor
 from std_msgs.msg import String
 from typing import Any, Dict, List, Optional, Set, Union
 
+from common.polyflow_kernel import PolyflowKernel
+
+
+def _ros_msg_to_dict(msg: Any) -> dict:
+    """Convert a ROS message instance to a plain dict, recursively."""
+    if hasattr(msg, 'get_fields_and_field_types'):
+        result = {}
+        for field_name in msg.get_fields_and_field_types():
+            value = getattr(msg, field_name)
+            result[field_name] = _ros_msg_to_dict(value)
+        return result
+    elif isinstance(msg, (list, tuple)):
+        return [_ros_msg_to_dict(item) for item in msg]
+    elif isinstance(msg, bytes):
+        return list(msg)
+    else:
+        return msg
+
+
+def _dict_to_ros_msg(data: dict, msg_type: type) -> Any:
+    """Populate a ROS message instance from a plain dict, recursively."""
+    msg = msg_type()
+    if not isinstance(data, dict):
+        return data
+
+    fields = msg.get_fields_and_field_types() if hasattr(msg, 'get_fields_and_field_types') else {}
+    for field_name, field_type_str in fields.items():
+        if field_name not in data:
+            continue
+        value = data[field_name]
+        current_field = getattr(msg, field_name)
+
+        if hasattr(current_field, 'get_fields_and_field_types'):
+            # Nested ROS message — recurse
+            nested = _dict_to_ros_msg(value, type(current_field))
+            setattr(msg, field_name, nested)
+        elif isinstance(value, list) and 'uint8' in field_type_str and '[]' in field_type_str:
+            # uint8[] fields expect bytes
+            setattr(msg, field_name, bytes(value))
+        else:
+            setattr(msg, field_name, value)
+    return msg
+
 
 class PolyflowNode(Node):
     """
@@ -23,10 +66,16 @@ class PolyflowNode(Node):
     - Breakpoint management: nodes can be paused at specific points.
     - Status reporting to the /ros/graph/node_status topic.
 
+    All portable decision-making logic lives in a PolyflowKernel instance
+    (self.kernel). Subclasses should set kernel_class to provide their own
+    kernel, or override process_input directly for ROS-specific behaviour.
+
     Topic convention: /graph/{node_id}/{pin_id}
     Each output pin publishes on its own typed topic. Each input pin subscribes
     to the source node's output topic as defined in POLYFLOW_INBOUND_CONNECTIONS.
     """
+
+    kernel_class: type = PolyflowKernel
 
     def __init__(self):
         # 1. Get Node ID and initialize the ROS Node
@@ -45,13 +94,14 @@ class PolyflowNode(Node):
         self.parameters: Dict[str, Any] = self._load_json_env("POLYFLOW_PARAMETERS", {})
         self.configuration: Dict[str, Any] = self._load_json_env("POLYFLOW_CONFIGURATION", {})
 
-        # --- Execution State ---
-        self._run_state: str = "RUN"  # Can be "RUN", "PAUSE", "BREAKPOINT_HIT"
-        self._step_budget: int = 0    # Number of steps allowed when paused
-
-        # Breakpoint management
-        self._active_breakpoints: Dict[str, Dict[str, Any]] = {}
-        self._breakpoint_hit_id: Optional[str] = None
+        # --- Instantiate the portable kernel ---
+        self.kernel = self.kernel_class(
+            node_id=self.node_id,
+            parameters=self.parameters,
+            configuration=self.configuration,
+            on_emit=self._kernel_emit,
+            on_log=self._kernel_log,
+        )
 
         # --- Graph Connection Setup ---
         self.inbound_connections: List[Dict[str, Any]] = self._load_json_env("POLYFLOW_INBOUND_CONNECTIONS", [])
@@ -87,6 +137,23 @@ class PolyflowNode(Node):
 
         # --- Logging (system-level topic, not a pin) ---
         self._log_publisher = None  # Lazy-initialized on first self.log() call
+
+    # --- Kernel callbacks ---
+
+    def _kernel_emit(self, pin_id: str, data: dict):
+        """Called by the kernel's emit(). Converts dict -> ROS msg and publishes."""
+        msg_type = self._output_pin_types.get(pin_id)
+        if not msg_type:
+            self.get_logger().debug(f"Kernel emitted on unregistered pin '{pin_id}'")
+            return
+        ros_msg = _dict_to_ros_msg(data, msg_type)
+        self.publish_to_pin(pin_id, ros_msg)
+
+    def _kernel_log(self, message: str):
+        """Called by the kernel's log(). Routes to ROS log topic."""
+        self.log(message)
+
+    # --- Pin Registration ---
 
     def register_output_pin(self, pin_id: str, msg_type: type, queue_size: int = 10):
         """
@@ -149,6 +216,8 @@ class PolyflowNode(Node):
         except Exception as e:
             self.get_logger().error(f"Error processing input on pin '{pin_id}': {e}")
 
+    # --- Helpers ---
+
     def _load_json_env(self, key: str, default: Any) -> Any:
         """Safely loads a JSON string from an environment variable."""
         raw = os.environ.get(key)
@@ -165,86 +234,14 @@ class PolyflowNode(Node):
             return default
 
     def get_param(self, keys: Union[str, List[str]], default: Any = None) -> Any:
-        """
-        Gets a parameter value, trying multiple keys in order.
-
-        Args:
-            keys: A single key or a list of keys to try.
-            default: The value to return if no key is found.
-        """
-        if isinstance(keys, str):
-            keys = [keys]
-        for key in keys:
-            if key in self.parameters:
-                return self.parameters[key]
-        return default
+        """Delegates to the kernel's get_param."""
+        return self.kernel.get_param(keys, default)
 
     def _control_message_callback(self, msg: String):
-        """Handles control commands like RUN, PAUSE, STEP, BREAKPOINT from the ROSDaemon."""
+        """Handles control commands — delegates to kernel after JSON parsing."""
         try:
             data = json.loads(msg.data)
-
-            target_nodes = data.get("target_nodes", [])
-            if target_nodes and self.node_id not in target_nodes:
-                return
-
-            command = data.get("command")
-
-            if command == "set_state":
-                new_state = data.get("state", "RUN")
-                if self._run_state == "BREAKPOINT_HIT" and new_state == "PAUSE":
-                    self.get_logger().info(f"Node '{self.node_id}' is at a breakpoint. Ignoring PAUSE command.")
-                    return
-
-                self._run_state = new_state
-                self.get_logger().info(f"Graph state set to: {self._run_state}")
-
-            elif command == "step":
-                if self._run_state == "PAUSE":
-                    steps = data.get("steps", 1)
-                    self._step_budget += steps
-                    self.get_logger().info(f"Stepping {steps} frames")
-
-            elif command == "set_breakpoint":
-                breakpoint_id = data.get("breakpoint_id")
-                condition = data.get("condition", {})
-                if breakpoint_id:
-                    self._active_breakpoints[breakpoint_id] = {"condition": condition, "hit": False}
-                    self.get_logger().info(f"Breakpoint '{breakpoint_id}' set on node '{self.node_id}'")
-
-            elif command == "continue_breakpoint":
-                breakpoint_id = data.get("breakpoint_id")
-                if breakpoint_id and breakpoint_id in self._active_breakpoints:
-                    del self._active_breakpoints[breakpoint_id]
-                    if self._breakpoint_hit_id == breakpoint_id:
-                        self._breakpoint_hit_id = None
-                        if not self._active_breakpoints and self._run_state == "BREAKPOINT_HIT":
-                            self._run_state = "RUN"
-                            self.get_logger().info(f"Node '{self.node_id}' resumed from breakpoint '{breakpoint_id}'.")
-                    self.get_logger().info(f"Breakpoint '{breakpoint_id}' cleared from node '{self.node_id}'.")
-                elif not breakpoint_id:
-                    self.get_logger().info(f"Continuing all breakpoints on node '{self.node_id}'.")
-                    self._active_breakpoints.clear()
-                    self._breakpoint_hit_id = None
-                    self._run_state = "RUN"
-
-            elif command == "clear_breakpoints":
-                breakpoint_id = data.get("breakpoint_id")
-                if breakpoint_id:
-                    if breakpoint_id in self._active_breakpoints:
-                        del self._active_breakpoints[breakpoint_id]
-                        if self._breakpoint_hit_id == breakpoint_id:
-                            self._breakpoint_hit_id = None
-                            if not self._active_breakpoints and self._run_state == "BREAKPOINT_HIT":
-                                self._run_state = "RUN"
-                        self.get_logger().info(f"Breakpoint '{breakpoint_id}' cleared from node '{self.node_id}'.")
-                else:
-                    self._active_breakpoints.clear()
-                    self._breakpoint_hit_id = None
-                    if self._run_state == "BREAKPOINT_HIT":
-                        self._run_state = "RUN"
-                    self.get_logger().info(f"All breakpoints cleared from node '{self.node_id}'.")
-
+            self.kernel.handle_control(data)
         except json.JSONDecodeError:
             self.get_logger().error(f"Received invalid JSON on /ros/graph/control: {msg.data}")
         except Exception as e:
@@ -252,20 +249,14 @@ class PolyflowNode(Node):
 
     def _publish_status(self):
         """Periodically reports this node's status and connectivity to the ROSDaemon."""
-        status_payload = {
-            "node": self.node_id,
-            "state": self._run_state,
-            "inputs": list(self._input_pin_types.keys()),
-            "outputs": list(self._output_pin_types.keys()),
-            "active_breakpoints": list(self._active_breakpoints.keys()),
-            "breakpoint_hit_id": self._breakpoint_hit_id,
-            "timestamp": time.time()
-        }
+        status = self.kernel.get_status()
+        status["inputs"] = list(self._input_pin_types.keys())
+        status["outputs"] = list(self._output_pin_types.keys())
 
         envelope = {
             "prp": "0.1",
             "type": "graph.node_state",
-            "payload": status_payload
+            "payload": status
         }
 
         msg = String()
@@ -310,47 +301,8 @@ class PolyflowNode(Node):
         self._log_publisher.publish(entry)
 
     def should_run(self, trigger_info: Optional[Dict[str, Any]] = None) -> bool:
-        """
-        Guard method to check if the node's main processing logic should execute.
-        This respects the PAUSE, STEP, and BREAKPOINT commands from the control plane.
-
-        Args:
-            trigger_info: Optional dictionary with context about the execution trigger.
-                          For input processing, this could be `{'pin_id': 'the_pin'}`.
-
-        Returns:
-            True if the node should execute its logic, False otherwise.
-        """
-        if self._run_state == "RUN":
-            for bp_id, bp_details in self._active_breakpoints.items():
-                if bp_details.get("hit"):
-                    continue
-
-                condition = bp_details.get("condition", {})
-                condition_met = True
-
-                if 'input_pin_id' in condition:
-                    if not trigger_info or trigger_info.get('pin_id') != condition['input_pin_id']:
-                        condition_met = False
-
-                if condition_met:
-                    self._breakpoint_hit_id = bp_id
-                    self._active_breakpoints[bp_id]["hit"] = True
-                    self._run_state = "BREAKPOINT_HIT"
-                    self.get_logger().info(f"Node '{self.node_id}' hit breakpoint '{bp_id}'. Pausing execution.")
-                    return False
-            return True
-
-        elif self._run_state == "PAUSE":
-            if self._step_budget > 0:
-                self._step_budget -= 1
-                return True
-            return False
-
-        elif self._run_state == "BREAKPOINT_HIT":
-            return False
-
-        return False
+        """Delegates to the kernel's execution state machine."""
+        return self.kernel.should_run(trigger_info)
 
     @property
     def output_pins(self) -> List[str]:
@@ -364,13 +316,19 @@ class PolyflowNode(Node):
 
     def process_input(self, pin_id: str, data: Any):
         """
-        **User-overridable method.** Called when a typed message arrives on an input pin.
+        Called when a typed ROS message arrives on an input pin.
+
+        By default, converts the ROS message to a dict and forwards to
+        the kernel's process_input. Subclasses that need direct ROS message
+        access (e.g. for hardware I/O in the same callback) can override
+        this and call self.kernel.process_input() when appropriate.
 
         Args:
             pin_id: The ID of the input pin that received the data.
             data: The typed ROS message.
         """
-        self.get_logger().warn(f"Node '{self.node_id}' received data on pin '{pin_id}' but 'process_input' is not implemented.")
+        data_dict = _ros_msg_to_dict(data)
+        self.kernel.process_input(pin_id, data_dict)
 
     async def run_async(self):
         """

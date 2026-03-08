@@ -16,6 +16,7 @@ from std_msgs.msg import String
 
 # Assumes 'polyflow-core' is in the PYTHONPATH, allowing `from common...`
 from common.polyflow_node import PolyflowNode
+from common.polyflow_kernel import PolyflowKernel
 
 
 def _now_monotonic_s() -> float:
@@ -283,20 +284,21 @@ class CANSimpleAxis:
             self._last_command_torque_nm = float(torque_nm)
 
 
-class ODriveS1Controller(PolyflowNode):
+class ODriveS1Kernel(PolyflowKernel):
     """
-    Polyflow node that bridges incoming trajectory commands to an ODrive S1.
+    Portable trajectory-processing logic for an ODrive S1 controller.
+
+    Parses incoming trajectory JSON, validates the target joint, clamps/quantizes
+    values, applies exponential smoothing, and emits a processed hardware command
+    dict. The actual hardware I/O (CAN, USB) is handled by the host wrapper.
+
+    Emits on "hw_command":
+        {"joint_id": str, "mode": str, "value": float, "scaled_value": float}
     """
 
-    def __init__(self):
-        # PolyflowNode handles node_id, inbound/outbound connections, and ROS node init
-        super().__init__()
-        self.get_logger().set_level(rclpy.logging.LoggingSeverity.DEBUG)
-        # Parameters and configuration are loaded by the PolyflowNode base class.
-
+    def setup(self):
         self.joint_id = self.get_param("joint")
         self.control_mode = self.get_param("control_mode", "position")
-        self.transport = self.get_param("transport", "usb")
 
         # Gear ratio: motor_turns = output_turns * gear_ratio
         gear_ratio = float(self.get_param("gear_ratio", 1.0))
@@ -318,6 +320,143 @@ class ODriveS1Controller(PolyflowNode):
         self.state_position_scale = float(self.get_param("state_position_scale", default_state_pos_scale))
         self.state_velocity_scale = float(self.get_param("state_velocity_scale", default_state_vel_scale))
 
+        self.lower_position = self.get_param(["limit.lower_position", "lower_position"])
+        self.upper_position = self.get_param(["limit.upper_position", "upper_position"])
+        self.position_step = self.get_param(["limit.position_step", "position_step"])
+        self.max_effort = self.get_param(["limit.max_effort", "max_effort"])
+        self.effort_step = self.get_param(["limit.effort_step", "effort_step"])
+        self.max_velocity = self.get_param(["limit.max_velocity", "max_velocity"])
+        self.velocity_step = self.get_param(["limit.velocity_step", "velocity_step"])
+
+        # Smoothing parameters
+        self.smoothing_alpha = float(self.get_param("smoothing_alpha", 0.0))
+        self._last_commanded_position: Dict[str, float] = {}
+        self._last_commanded_velocity: Dict[str, float] = {}
+
+    @staticmethod
+    def _clamp(value: float, min_v: Optional[float], max_v: Optional[float]) -> float:
+        if min_v is not None:
+            value = max(value, float(min_v))
+        if max_v is not None:
+            value = min(value, float(max_v))
+        return value
+
+    @staticmethod
+    def _quantize(value: float, step: Optional[float]) -> float:
+        if step is None or step == 0:
+            return value
+        return round(value / float(step)) * float(step)
+
+    def process_input(self, pin_id: str, data: dict):
+        if not self.should_run(trigger_info={'pin_id': pin_id}):
+            return
+
+        if pin_id != "trajectory":
+            return
+
+        # The trajectory pin carries a JSON string inside a String msg
+        raw_json = data.get("data")
+        if not raw_json:
+            return
+
+        try:
+            trajectory = json.loads(raw_json)
+        except (json.JSONDecodeError, TypeError):
+            self.log("Trajectory payload must be a JSON string")
+            return
+
+        if not isinstance(trajectory, dict):
+            self.log("Trajectory payload must be an object")
+            return
+
+        # Check if the command is for the joint this node controls
+        joint_id = trajectory.get("jointId") or trajectory.get("joint_id")
+        if joint_id != self.joint_id:
+            return
+
+        point_data = trajectory.get("point") or trajectory.get("points", [{}])
+        if isinstance(point_data, list):
+            point_data = point_data[-1] if point_data else {}
+
+        if not isinstance(point_data, dict):
+            self.log("Trajectory point must be an object")
+            return
+
+        position = None
+        velocity = None
+        effort = None
+        if point_data.get("positions"): position = point_data["positions"][0]
+        if point_data.get("velocities"): velocity = point_data["velocities"][0]
+        if point_data.get("effort"): effort = point_data["effort"][0]
+        elif point_data.get("efforts"): effort = point_data["efforts"][0]
+
+        self._compute_command(joint_id, position, velocity, effort)
+
+    def _compute_command(
+        self, joint_id: str, position: Optional[float], velocity: Optional[float], effort: Optional[float]
+    ) -> None:
+        """Clamp, quantize, smooth, scale, and emit a hardware command dict."""
+        if self.control_mode == "velocity" and velocity is not None:
+            vel_cmd = float(velocity)
+            vel_cmd = self._clamp(vel_cmd, None, self.max_velocity)
+            vel_cmd = self._quantize(vel_cmd, self.velocity_step)
+
+            if self.smoothing_alpha > 0 and joint_id in self._last_commanded_velocity:
+                vel_cmd = self.smoothing_alpha * self._last_commanded_velocity[joint_id] + (1 - self.smoothing_alpha) * vel_cmd
+            self._last_commanded_velocity[joint_id] = vel_cmd
+
+            self.emit("hw_command", {
+                "joint_id": joint_id,
+                "mode": "velocity",
+                "value": vel_cmd,
+                "scaled_value": vel_cmd * float(self.cmd_velocity_scale),
+            })
+
+        elif self.control_mode == "position" and position is not None:
+            pos_cmd = float(position)
+            pos_cmd = self._clamp(pos_cmd, self.lower_position, self.upper_position)
+            pos_cmd = self._quantize(pos_cmd, self.position_step)
+
+            if self.smoothing_alpha > 0 and joint_id in self._last_commanded_position:
+                pos_cmd = self.smoothing_alpha * self._last_commanded_position[joint_id] + (1 - self.smoothing_alpha) * pos_cmd
+            self._last_commanded_position[joint_id] = pos_cmd
+
+            self.emit("hw_command", {
+                "joint_id": joint_id,
+                "mode": "position",
+                "value": pos_cmd,
+                "scaled_value": pos_cmd * float(self.cmd_position_scale),
+            })
+
+        elif self.control_mode == "torque" and effort is not None:
+            eff_cmd = float(effort)
+            eff_cmd = self._clamp(eff_cmd, None, self.max_effort)
+            eff_cmd = self._quantize(eff_cmd, self.effort_step)
+
+            self.emit("hw_command", {
+                "joint_id": joint_id,
+                "mode": "torque",
+                "value": eff_cmd,
+                "scaled_value": eff_cmd,
+            })
+
+
+class ODriveS1Controller(PolyflowNode):
+    """
+    ROS wrapper for ODriveS1Kernel.
+
+    Handles pin registration, CAN/USB hardware lifecycle, and translating
+    kernel hw_command emissions into actual axis controller writes.
+    """
+
+    kernel_class = ODriveS1Kernel
+
+    def __init__(self):
+        super().__init__()
+        self.get_logger().set_level(rclpy.logging.LoggingSeverity.DEBUG)
+
+        self.transport = self.get_param("transport", "usb")
+
         # CAN transport parameters (only used when `transport="can"`)
         self.can_node_id = int(self.get_param("can.node_id", 0))
         self.can_interface = str(self.get_param("can.interface", "socketcan"))
@@ -332,24 +471,14 @@ class ODriveS1Controller(PolyflowNode):
         self.can_torque_constant = self.get_param("can.torque_constant")
         if self.can_torque_constant is not None:
             self.can_torque_constant = float(self.can_torque_constant)
-
         self.can_command_ids = self.get_param("can.command_ids")
         if self.can_command_ids is not None and not isinstance(self.can_command_ids, dict):
             self.can_command_ids = None
-        self.lower_position = self.get_param(["limit.lower_position", "lower_position"])
-        self.upper_position = self.get_param(["limit.upper_position", "upper_position"])
-        self.position_step = self.get_param(["limit.position_step", "position_step"])
-        self.max_effort = self.get_param(["limit.max_effort", "max_effort"])
-        self.effort_step = self.get_param(["limit.effort_step", "effort_step"])
-        self.max_velocity = self.get_param(["limit.max_velocity", "max_velocity"])
-        self.velocity_step = self.get_param(["limit.velocity_step", "velocity_step"])
-
-        # Smoothing parameters
-        self.smoothing_alpha = float(self.get_param("smoothing_alpha", 0.0))  # 0 = no smoothing, 0.9 = heavy smoothing
-        self._last_commanded_position: Dict[str, float] = {}
-        self._last_commanded_velocity: Dict[str, float] = {}
 
         self.axes: Dict[str, Any] = {}
+
+        # Wire kernel hw_command emissions to hardware
+        self.kernel.on_emit = self._on_kernel_emit
 
         # Register typed pins (using String for complex JSON protocol)
         self.register_input_pin("trajectory", String)
@@ -366,134 +495,54 @@ class ODriveS1Controller(PolyflowNode):
         fastdds_profile = os.environ.get('FASTRTPS_DEFAULT_PROFILES_FILE', 'not set')
 
         self.get_logger().info(
-            f"ODrive S1 node starting (id={self.node_id}) for joint={self.joint_id}, "
-            f"mode={self.control_mode}, ROS_DOMAIN_ID={domain_id}"
+            f"ODrive S1 node starting (id={self.node_id}) for joint={self.kernel.joint_id}, "
+            f"mode={self.kernel.control_mode}, ROS_DOMAIN_ID={domain_id}"
         )
         self.get_logger().info(
             f"DDS config - ROS_LOCALHOST_ONLY={ros_localhost_only}, "
             f"CYCLONEDDS_URI={cyclone_uri}, FASTRTPS_DEFAULT_PROFILES_FILE={fastdds_profile}"
         )
 
-    @staticmethod
-    def _clamp(value: float, min_v: Optional[float], max_v: Optional[float]) -> float:
-        if min_v is not None:
-            value = max(value, float(min_v))
-        if max_v is not None:
-            value = min(value, float(max_v))
-        return value
+    def _on_kernel_emit(self, pin_id: str, data: dict):
+        """Route kernel emissions to hardware or ROS publishers."""
+        if pin_id == "hw_command":
+            self._apply_hw_command(data)
+        else:
+            # Default: convert dict to ROS msg and publish
+            from common.polyflow_node import _dict_to_ros_msg
+            msg_type = self._output_pin_types.get(pin_id)
+            if msg_type:
+                ros_msg = _dict_to_ros_msg(data, msg_type)
+                self.publish_to_pin(pin_id, ros_msg)
 
-    @staticmethod
-    def _quantize(value: float, step: Optional[float]) -> float:
-        if step is None or step == 0:
-            return value
-        return round(value / float(step)) * float(step)
-
-
-    def register_axis(self, joint_id: str, axis: Any) -> None:
-        self.axes[joint_id] = axis
-        if self.max_velocity is not None:
-            try:
-                axis.controller.config.vel_limit = float(self.max_velocity)
-            except Exception as exc:  # Hardware config errors should not crash the node
-                self.get_logger().warning(f"Failed to set velocity limit on {joint_id}: {exc}")
-
-    def process_input(self, pin_id: str, msg: Any):
-        """
-        Handles incoming trajectory commands from the Polyflow graph.
-        This method is called by the PolyflowNode base class.
-        """
-        if not self.should_run(trigger_info={'pin_id': pin_id}):
-            return
-
-        if pin_id != "trajectory":
-            self.get_logger().debug(f"Ignoring input on unhandled pin '{pin_id}'")
-            return
-
-        try:
-            data = json.loads(msg.data)
-        except (json.JSONDecodeError, AttributeError):
-            self.get_logger().warn("Trajectory payload must be a JSON string")
-            return
-
-        self.get_logger().info(
-            f"process_input invoked! pin_id={pin_id}, data={data}"
-        )
-
-        if not isinstance(data, dict):
-            self.get_logger().warn("Trajectory payload must be an object")
-            return
-
-        # Check if the command is for the joint this node controls
-        joint_id = data.get("jointId") or data.get("joint_id")
-        if joint_id != self.joint_id:
-            self.get_logger().debug(f"Ignoring command for joint '{joint_id}' (this node controls '{self.joint_id}')")
-            return
-
-        point_data = data.get("point") or data.get("points", [{}])
-        if isinstance(point_data, list):
-            point_data = point_data[-1] if point_data else {}
-
-        if not isinstance(point_data, dict):
-            self.get_logger().warn("Trajectory point must be an object")
-            return
-
-        position = None
-        velocity = None
-        effort = None
-        if point_data.get("positions"): position = point_data["positions"][0]
-        if point_data.get("velocities"): velocity = point_data["velocities"][0]
-        if point_data.get("effort"): effort = point_data["effort"][0]
-        elif point_data.get("efforts"): effort = point_data["efforts"][0]
-
-        self._apply_command(self.joint_id, position, velocity, effort)
-
-    def _apply_command(
-        self, joint_id: str, position: Optional[float], velocity: Optional[float], effort: Optional[float]
-    ) -> None:
+    def _apply_hw_command(self, cmd: dict) -> None:
+        """Apply a processed command from the kernel to the hardware axis."""
+        joint_id = cmd["joint_id"]
         axis = self.axes.get(joint_id)
         if axis is None:
             self.get_logger().warning(f"No ODrive axis registered for joint_id={joint_id}")
             return
 
         try:
-            if self.control_mode == "velocity" and velocity is not None:
-                vel_cmd = float(velocity)
-                vel_cmd = self._clamp(vel_cmd, None, self.max_velocity)
-                vel_cmd = self._quantize(vel_cmd, self.velocity_step)
-
-                # Apply exponential smoothing if enabled
-                if self.smoothing_alpha > 0 and joint_id in self._last_commanded_velocity:
-                    vel_cmd = self.smoothing_alpha * self._last_commanded_velocity[joint_id] + (1 - self.smoothing_alpha) * vel_cmd
-                self._last_commanded_velocity[joint_id] = vel_cmd
-
-                vel_scaled = vel_cmd * float(self.cmd_velocity_scale)
-                axis.controller.input_vel = vel_scaled
-                self.get_logger().debug(f"Set velocity for {joint_id}: {vel_cmd} (scaled={vel_scaled})")
-
-            elif self.control_mode == "position" and position is not None:
-                pos_cmd = float(position)
-                pos_cmd = self._clamp(pos_cmd, self.lower_position, self.upper_position)
-                pos_cmd = self._quantize(pos_cmd, self.position_step)
-
-                # Apply exponential smoothing if enabled
-                if self.smoothing_alpha > 0 and joint_id in self._last_commanded_position:
-                    pos_cmd = self.smoothing_alpha * self._last_commanded_position[joint_id] + (1 - self.smoothing_alpha) * pos_cmd
-                self._last_commanded_position[joint_id] = pos_cmd
-
-                pos_scaled = pos_cmd * float(self.cmd_position_scale)
-                axis.controller.input_pos = pos_scaled
-                self.get_logger().debug(f"Set position for {joint_id}: {pos_cmd} (scaled={pos_scaled})")
-
-            elif self.control_mode == "torque" and effort is not None:
-                eff_cmd = float(effort)
-                eff_cmd = self._clamp(eff_cmd, None, self.max_effort)
-                eff_cmd = self._quantize(eff_cmd, self.effort_step)
-                axis.controller.input_torque = eff_cmd
-                self.get_logger().debug(f"Set torque for {joint_id}: {eff_cmd}")
-            else:
-                self.get_logger().debug(f"No valid command for {joint_id} in mode={self.control_mode}")
+            mode = cmd["mode"]
+            scaled = cmd["scaled_value"]
+            if mode == "velocity":
+                axis.controller.input_vel = scaled
+            elif mode == "position":
+                axis.controller.input_pos = scaled
+            elif mode == "torque":
+                axis.controller.input_torque = cmd["value"]
+            self.get_logger().debug(f"Set {mode} for {joint_id}: {cmd['value']} (scaled={scaled})")
         except Exception as exc:
             self.get_logger().error(f"Failed to apply command for {joint_id}: {exc}")
+
+    def register_axis(self, joint_id: str, axis: Any) -> None:
+        self.axes[joint_id] = axis
+        if self.kernel.max_velocity is not None:
+            try:
+                axis.controller.config.vel_limit = float(self.kernel.max_velocity)
+            except Exception as exc:
+                self.get_logger().warning(f"Failed to set velocity limit on {joint_id}: {exc}")
 
     def _publish_joint_state(self) -> None:
         if not self.axes:
@@ -505,11 +554,11 @@ class ODriveS1Controller(PolyflowNode):
             return
 
         for joint_id, axis in self.axes.items():
-            if joint_id != self.joint_id:
+            if joint_id != self.kernel.joint_id:
                 continue
             try:
-                pos = float(axis.encoder.pos_estimate) * float(self.state_position_scale)
-                vel = float(axis.encoder.vel_estimate) * float(self.state_velocity_scale)
+                pos = float(axis.encoder.pos_estimate) * float(self.kernel.state_position_scale)
+                vel = float(axis.encoder.vel_estimate) * float(self.kernel.state_velocity_scale)
                 torque_constant = getattr(axis.motor, "torque_constant", None)
                 iq_measured = getattr(axis.motor.foc, "Iq_measured", None)
                 effort = None
@@ -556,19 +605,19 @@ class ODriveS1Controller(PolyflowNode):
                 self.get_logger().error(f"Failed to open CAN interface {self.can_interface}:{self.can_channel}: {exc}")
                 return
 
-            if not self.joint_id:
+            if not self.kernel.joint_id:
                 self.get_logger().error("No joint_id configured; cannot register ODrive axis")
                 axis.shutdown()
                 return
 
-            self.register_axis(self.joint_id, axis)
+            self.register_axis(self.kernel.joint_id, axis)
             self.get_logger().info(
                 f"Connected to ODrive CANSimple (node_id={self.can_node_id}, {self.can_interface}:{self.can_channel}), bitrate={self.can_bitrate}"
             )
 
-            if self.control_mode == "velocity":
+            if self.kernel.control_mode == "velocity":
                 axis.set_controller_mode(axis.CONTROL_MODE_VELOCITY_CONTROL, axis.INPUT_MODE_PASSTHROUGH)
-            elif self.control_mode == "torque":
+            elif self.kernel.control_mode == "torque":
                 axis.set_controller_mode(axis.CONTROL_MODE_TORQUE_CONTROL, axis.INPUT_MODE_PASSTHROUGH)
             else:
                 axis.set_controller_mode(axis.CONTROL_MODE_POSITION_CONTROL, axis.INPUT_MODE_PASSTHROUGH)
@@ -635,19 +684,19 @@ class ODriveS1Controller(PolyflowNode):
             return
 
         axis = available_axes[0]
-        self.register_axis(self.joint_id, axis)
+        self.register_axis(self.kernel.joint_id, axis)
         # Configure control mode and enable closed-loop
-        if self.control_mode == "velocity":
+        if self.kernel.control_mode == "velocity":
             axis.controller.config.control_mode = ControlMode.VELOCITY_CONTROL
             axis.controller.config.input_mode = InputMode.PASSTHROUGH
-        elif self.control_mode == "torque":
+        elif self.kernel.control_mode == "torque":
             axis.controller.config.control_mode = ControlMode.TORQUE_CONTROL
             axis.controller.config.input_mode = InputMode.PASSTHROUGH
         else:
             axis.controller.config.control_mode = ControlMode.POSITION_CONTROL
             axis.controller.config.input_mode = InputMode.PASSTHROUGH
         axis.requested_state = AxisState.CLOSED_LOOP_CONTROL
-        self.get_logger().info(f"Joint {self.joint_id} registered to axis0 in mode={self.control_mode}")
+        self.get_logger().info(f"Joint {self.kernel.joint_id} registered to axis0 in mode={self.kernel.control_mode}")
 
         while rclpy.ok():
             await asyncio.sleep(0.05)
