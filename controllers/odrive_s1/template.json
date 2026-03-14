@@ -22,6 +22,11 @@
         "history": "keep_last",
         "depth": 10
       }
+    },
+    {
+      "name": "mode",
+      "direction": "subscribe",
+      "msg_type": "std_msgs/String"
     }
   ],
   "services": [],
@@ -43,14 +48,6 @@
         "label_field": "name"
       },
       "ui": { "group": "Joint", "order": 1 }
-    },
-
-    "control_mode": {
-      "label": "Control Mode",
-      "type": "enum",
-      "values": ["velocity", "position", "torque"],
-      "default": "position",
-      "ui": { "group": "Control", "order": 2 }
     },
 
     "transport": {
