@@ -69,6 +69,13 @@ class ODriveS1Kernel(PolyflowKernel):
         return round(value / float(step)) * float(step)
 
     def process_input(self, pin_id: str, data: dict):
+        if pin_id == "set_mode":
+            mode = data.get("mode") if isinstance(data, dict) else None
+            if mode in ("position", "velocity", "torque"):
+                self.control_mode = mode
+                self.emit("state", {"control_mode": self.control_mode})
+            return
+
         if not self.should_run(trigger_info={'pin_id': pin_id}):
             return
 
