@@ -69,6 +69,8 @@ class ODriveS1Kernel(PolyflowKernel):
         return round(value / float(step)) * float(step)
 
     def process_input(self, pin_id: str, data: dict):
+        self.log(f"process_input called: pin_id={pin_id}, joint_id={self.joint_id}, data_type={type(data).__name__}")
+
         if pin_id == "mode":
             # std_msgs/String format: {"data": "position"}
             raw = data.get("data") if isinstance(data, dict) else None
@@ -78,15 +80,17 @@ class ODriveS1Kernel(PolyflowKernel):
             return
 
         if not self.should_run(trigger_info={'pin_id': pin_id}):
+            self.log(f"should_run returned False for pin_id={pin_id}")
             return
 
         if pin_id != "trajectory":
+            self.log(f"pin_id '{pin_id}' != 'trajectory', skipping")
             return
 
         # Format 1: JointTrajectoryPoint with name[] + positions[] arrays (from IK / upstream nodes)
         names = data.get("name", [])
         positions = data.get("positions", [])
-        self.log(f"trajectory input: pin={pin_id}, joint_id={self.joint_id}, names={list(names)}, positions={list(positions)}, data_keys={list(data.keys()) if isinstance(data, dict) else type(data)}")
+        self.log(f"trajectory input: names={list(names)}, positions={list(positions)}")
         if names and positions:
             try:
                 idx = list(names).index(self.joint_id)
