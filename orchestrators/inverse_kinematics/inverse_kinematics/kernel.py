@@ -79,9 +79,11 @@ class InverseKinematicsKernel(PolyflowKernel):
         self._num_joints = len(self._chain)
         self._current_joint_positions: Optional[List[float]] = None
 
-        # Map joint names to chain indices for fan-in state accumulation
+        # Map joint IDs (and names as fallback) to chain indices for fan-in state accumulation
         self._joint_name_to_idx: Dict[str, int] = {}
         for i, joint in enumerate(self._chain):
+            if joint.get("_id"):
+                self._joint_name_to_idx[joint["_id"]] = i
             self._joint_name_to_idx[joint["name"]] = i
 
         self.log(f"IK chain from '{self.root_component_id}' to '{self.end_effector_component_id}' with {self._num_joints} actuated joints, {len(self.components)} components, {len(self.joints)} joints")
@@ -189,7 +191,11 @@ class InverseKinematicsKernel(PolyflowKernel):
 
             child_id = joint.get("child", "")
             child_comp = comp_by_id.get(child_id, {})
+            # Use _id (output ID) as the canonical joint identifier —
+            # downstream controllers (e.g. ODrive) match on this, not display name.
+            joint_id = joint.get("_id", joint.get("parent_output", ""))
             chain.append({
+                "_id": joint_id,
                 "name": joint.get("name", child_comp.get("name", "unnamed")),
                 "type": joint_type,
                 "axis": axis,
@@ -372,8 +378,8 @@ class InverseKinematicsKernel(PolyflowKernel):
             solution = self._solve_ik(data, self._current_joint_positions)
             self.log(f"IK solution: {solution}")
             if solution is not None:
-                joint_names = [joint["name"] for joint in self._chain]
+                joint_ids = [joint["_id"] for joint in self._chain]
                 self.emit("joint_commands", {
-                    "name": joint_names,
+                    "name": joint_ids,
                     "positions": solution,
                 })
