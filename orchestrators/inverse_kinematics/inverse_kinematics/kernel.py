@@ -78,6 +78,11 @@ class InverseKinematicsKernel(PolyflowKernel):
         self._num_joints = len(self._chain)
         self._current_joint_positions: Optional[List[float]] = None
 
+        # Map joint names to chain indices for fan-in state accumulation
+        self._joint_name_to_idx: Dict[str, int] = {}
+        for i, joint in enumerate(self._chain):
+            self._joint_name_to_idx[joint["name"]] = i
+
         self.log(f"IK chain from '{self.root_component_id}' with {self._num_joints} actuated joints")
 
     def _build_chain(
@@ -307,7 +312,25 @@ class InverseKinematicsKernel(PolyflowKernel):
             return
 
         if pin_id == "joint_states":
-            self._current_joint_positions = data.get("positions", [])
+            # Initialize positions array on first use
+            if self._current_joint_positions is None:
+                self._current_joint_positions = [0.0] * self._num_joints
+
+            # Handle individual joint state messages (fan-in from controllers)
+            # Format: {"name": ["joint_id"], "position": [pos], ...}
+            names = data.get("name", [])
+            positions = data.get("position", [])
+
+            if names and positions:
+                for name, pos in zip(names, positions):
+                    idx = self._joint_name_to_idx.get(name)
+                    if idx is not None:
+                        self._current_joint_positions[idx] = float(pos)
+            else:
+                # Fallback: combined positions array
+                combined = data.get("positions", [])
+                if combined:
+                    self._current_joint_positions = list(combined)
 
         elif pin_id == "target_pose":
             if self._current_joint_positions is None:

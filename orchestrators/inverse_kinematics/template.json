@@ -11,7 +11,7 @@
     {
       "name": "joint_states",
       "direction": "subscribe",
-      "msg_type": "sensor_msgs/JointState"
+      "msg_type": "sensor_msgs/JointState[]"
     },
     {
       "name": "joint_commands",
