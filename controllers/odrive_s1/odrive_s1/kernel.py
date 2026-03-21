@@ -83,7 +83,27 @@ class ODriveS1Kernel(PolyflowKernel):
         if pin_id != "trajectory":
             return
 
-        # The trajectory pin carries a JSON string inside a String msg
+        # Format 1: JointTrajectoryPoint with name[] + positions[] arrays (from IK / upstream nodes)
+        names = data.get("name", [])
+        positions = data.get("positions", [])
+        if names and positions:
+            try:
+                idx = list(names).index(self.joint_id)
+            except ValueError:
+                return  # This command isn't for our joint
+            position = float(positions[idx])
+            velocity = None
+            effort = None
+            velocities = data.get("velocities", [])
+            efforts = data.get("effort", data.get("efforts", []))
+            if velocities and len(velocities) > idx:
+                velocity = float(velocities[idx])
+            if efforts and len(efforts) > idx:
+                effort = float(efforts[idx])
+            self._compute_command(self.joint_id, position, velocity, effort)
+            return
+
+        # Format 2: JSON string envelope from sidebar controls (legacy)
         raw_json = data.get("data")
         if not raw_json:
             return
@@ -98,7 +118,6 @@ class ODriveS1Kernel(PolyflowKernel):
             self.log("Trajectory payload must be an object")
             return
 
-        # Check if the command is for the joint this node controls
         joint_id = trajectory.get("jointId") or trajectory.get("joint_id")
         if joint_id != self.joint_id:
             return

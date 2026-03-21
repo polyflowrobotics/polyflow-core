@@ -338,4 +338,8 @@ class InverseKinematicsKernel(PolyflowKernel):
 
             solution = self._solve_ik(data, self._current_joint_positions)
             if solution is not None:
-                self.emit("joint_commands", {"positions": solution})
+                joint_names = [joint["name"] for joint in self._chain]
+                self.emit("joint_commands", {
+                    "name": joint_names,
+                    "positions": solution,
+                })
