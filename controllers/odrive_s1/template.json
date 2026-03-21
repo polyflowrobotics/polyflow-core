@@ -26,7 +26,8 @@
     {
       "name": "mode",
       "direction": "subscribe",
-      "msg_type": "std_msgs/String"
+      "msg_type": "std_msgs/String",
+      "allowed_values": ["position", "velocity", "torque"]
     }
   ],
   "services": [],

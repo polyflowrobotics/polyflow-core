@@ -6,7 +6,8 @@
     {
       "name": "set_mode",
       "direction": "subscribe",
-      "msg_type": "polyflow_msgs/ModeCommand"
+      "msg_type": "polyflow_msgs/ModeCommand",
+      "allowed_values": ["teleop", "automated", "stopped"]
     },
     {
       "name": "mode",
@@ -16,22 +17,6 @@
   ],
   "services": [],
   "actions": [],
-  "parameters_schema": {
-    "default_mode": {
-      "label": "Default Mode",
-      "type": "enum",
-      "values": ["teleop", "automated", "stopped"],
-      "default": "stopped",
-      "description": "Starting operating mode.",
-      "ui": { "group": "Mode", "order": 1 }
-    },
-    "allowed_modes": {
-      "label": "Allowed Modes",
-      "type": "array",
-      "default": ["teleop", "automated", "stopped"],
-      "description": "List of valid operating modes.",
-      "ui": { "group": "Mode", "order": 2 }
-    }
-  },
+  "parameters_schema": {},
   "defaults": {}
 }
