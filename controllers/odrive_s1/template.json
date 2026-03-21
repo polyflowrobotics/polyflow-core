@@ -4,7 +4,7 @@
   "entry_point": "odrive_s1/node.py",
   "topics": [
     {
-      "name": "/joint/state",
+      "name": "state",
       "direction": "publish",
       "msg_type": "sensor_msgs/JointState",
       "qos": {
@@ -14,7 +14,7 @@
       }
     },
     {
-      "name": "/joint_controller/command",
+      "name": "trajectory",
       "direction": "subscribe",
       "msg_type": "trajectory_msgs/JointTrajectory",
       "qos": {
