@@ -68,13 +68,14 @@ class InverseKinematicsKernel(PolyflowKernel):
 
     def setup(self):
         self.root_component_id: str = self.get_param("root_component_id", "")
+        self.end_effector_component_id: str = self.get_param("end_effector_component_id", "")
         self.components: List[Dict[str, Any]] = self.get_param("components", [])
         self.joints: List[Dict[str, Any]] = self.get_param("joints", [])
         self.max_iterations = int(self.get_param("max_iterations", 100))
         self.tolerance = float(self.get_param("tolerance", 0.001))
         self.damping = float(self.get_param("damping", 0.01))
 
-        self._chain = self._build_chain(self.root_component_id, self.components, self.joints)
+        self._chain = self._build_chain(self.root_component_id, self.end_effector_component_id, self.components, self.joints)
         self._num_joints = len(self._chain)
         self._current_joint_positions: Optional[List[float]] = None
 
@@ -88,23 +89,25 @@ class InverseKinematicsKernel(PolyflowKernel):
     def _build_chain(
         self,
         root_component_id: str,
+        end_effector_component_id: str,
         components: List[Dict[str, Any]],
         joints: List[Dict[str, Any]],
     ) -> List[Dict[str, Any]]:
         """
-        Walk the component tree from root_component_id downward via joints,
-        building an ordered kinematic chain of actuated joints to the end-effector.
+        Build a kinematic chain from root_component_id to end_effector_component_id.
+
+        Uses BFS to find the unique path through the joint tree, then extracts
+        only the actuated joints along that path.
         """
         comp_by_id = {c.get("_id", c.get("component_id", "")): c for c in components}
-
-        self.log(f"_build_chain: comp_by_id keys = {list(comp_by_id.keys())}")
-        self.log(f"_build_chain: root_component_id = '{root_component_id}', found = {root_component_id in comp_by_id}")
 
         if not root_component_id or root_component_id not in comp_by_id:
             self.log(f"Root component '{root_component_id}' not found — chain will be empty")
             return []
 
-        base_id = root_component_id
+        if not end_effector_component_id or end_effector_component_id not in comp_by_id:
+            self.log(f"End effector '{end_effector_component_id}' not found — chain will be empty")
+            return []
 
         # Index joints by parent component id
         joints_by_parent: Dict[str, List[Dict[str, Any]]] = {}
@@ -114,65 +117,74 @@ class InverseKinematicsKernel(PolyflowKernel):
                 joints_by_parent[pid] = []
             joints_by_parent[pid].append(j)
 
-        self.log(f"_build_chain: joints_by_parent keys = {list(joints_by_parent.keys())}")
+        # BFS from root to end-effector, tracking the path
+        from collections import deque
+        queue: deque = deque([(root_component_id, [])])
+        visited = {root_component_id}
+        path_joints: Optional[List[Dict[str, Any]]] = None
 
-        # BFS/DFS from base to build ordered chain
-        chain = []
-        visited = set()
-        stack = [base_id]
+        while queue:
+            comp_id, path = queue.popleft()
 
-        while stack:
-            comp_id = stack.pop()
-            if comp_id in visited:
-                continue
-            visited.add(comp_id)
+            if comp_id == end_effector_component_id:
+                path_joints = path
+                break
 
             for joint in joints_by_parent.get(comp_id, []):
                 child_id = joint.get("child", "")
-                joint_type = joint.get("joint_type", "Fixed")
+                if child_id and child_id not in visited:
+                    visited.add(child_id)
+                    queue.append((child_id, path + [joint]))
 
-                origin = joint.get("origin", {})
-                translation = np.array([
-                    origin.get("x", 0),
-                    origin.get("y", 0),
-                    origin.get("z", 0),
-                ], dtype=float)
-                rotation_euler = np.array([
-                    origin.get("rx", 0),
-                    origin.get("ry", 0),
-                    origin.get("rz", 0),
-                ], dtype=float)
+        if path_joints is None:
+            self.log(f"No path from '{root_component_id}' to '{end_effector_component_id}'")
+            return []
 
-                axis_raw = joint.get("axis", {"x": 0, "y": 0, "z": 1})
-                axis = np.array([
-                    axis_raw.get("x", 0),
-                    axis_raw.get("y", 0),
-                    axis_raw.get("z", 1),
-                ], dtype=float)
+        # Extract actuated joints along the path
+        chain = []
+        for joint in path_joints:
+            joint_type = joint.get("joint_type", "Fixed")
 
-                limit = joint.get("limit", {})
+            if joint_type not in ("Revolute", "Continuous", "Prismatic"):
+                continue
 
-                # Only actuated joints go into the chain
-                if joint_type in ("Revolute", "Continuous", "Prismatic"):
-                    lower = limit.get("lower", -math.pi)
-                    upper = limit.get("upper", math.pi)
-                    if joint_type == "Continuous":
-                        lower = -math.pi
-                        upper = math.pi
+            origin = joint.get("origin", {})
+            translation = np.array([
+                origin.get("x", 0),
+                origin.get("y", 0),
+                origin.get("z", 0),
+            ], dtype=float)
+            rotation_euler = np.array([
+                origin.get("rx", 0),
+                origin.get("ry", 0),
+                origin.get("rz", 0),
+            ], dtype=float)
 
-                    child_comp = comp_by_id.get(child_id, {})
-                    chain.append({
-                        "name": joint.get("name", child_comp.get("name", "unnamed")),
-                        "type": joint_type,
-                        "axis": axis,
-                        "origin_translation": translation,
-                        "origin_rotation": rotation_euler,
-                        "lower": lower,
-                        "upper": upper,
-                    })
+            axis_raw = joint.get("axis", {"x": 0, "y": 0, "z": 1})
+            axis = np.array([
+                axis_raw.get("x", 0),
+                axis_raw.get("y", 0),
+                axis_raw.get("z", 1),
+            ], dtype=float)
 
-                if child_id:
-                    stack.append(child_id)
+            limit = joint.get("limit", {})
+            lower = limit.get("lower", -math.pi)
+            upper = limit.get("upper", math.pi)
+            if joint_type == "Continuous":
+                lower = -math.pi
+                upper = math.pi
+
+            child_id = joint.get("child", "")
+            child_comp = comp_by_id.get(child_id, {})
+            chain.append({
+                "name": joint.get("name", child_comp.get("name", "unnamed")),
+                "type": joint_type,
+                "axis": axis,
+                "origin_translation": translation,
+                "origin_rotation": rotation_euler,
+                "lower": lower,
+                "upper": upper,
+            })
 
         return chain
 

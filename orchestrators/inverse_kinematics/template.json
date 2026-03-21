@@ -27,16 +27,26 @@
       "requiresInstance": true,
       "type": "entity",
       "required": true,
-      "description": "The root component of the kinematic chain (e.g. hip, shoulder). The solver walks downward from here to the end-effector.",
+      "description": "The root (base) component of the kinematic chain. The solver walks downward from here toward the end-effector.",
       "entity_source": {
         "selector": "components",
-        "filters": {
-          "base": false
-        },
         "value_field": "_id",
         "label_field": "name"
       },
       "ui": { "group": "Chain", "order": 1 }
+    },
+    "end_effector_component_id": {
+      "label": "End Effector",
+      "requiresInstance": true,
+      "type": "entity",
+      "required": true,
+      "description": "The tip component of the kinematic chain (e.g. hand, gripper). The solver builds a path from root to this component.",
+      "entity_source": {
+        "selector": "components",
+        "value_field": "_id",
+        "label_field": "name"
+      },
+      "ui": { "group": "Chain", "order": 2 }
     },
     "components": {
       "label": "Robot Components",
