@@ -86,10 +86,12 @@ class ODriveS1Kernel(PolyflowKernel):
         # Format 1: JointTrajectoryPoint with name[] + positions[] arrays (from IK / upstream nodes)
         names = data.get("name", [])
         positions = data.get("positions", [])
+        self.log(f"trajectory input: pin={pin_id}, joint_id={self.joint_id}, names={list(names)}, positions={list(positions)}, data_keys={list(data.keys()) if isinstance(data, dict) else type(data)}")
         if names and positions:
             try:
                 idx = list(names).index(self.joint_id)
             except ValueError:
+                self.log(f"joint_id '{self.joint_id}' not found in names {list(names)}")
                 return  # This command isn't for our joint
             position = float(positions[idx])
             velocity = None
