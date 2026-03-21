@@ -84,7 +84,7 @@ class InverseKinematicsKernel(PolyflowKernel):
         for i, joint in enumerate(self._chain):
             self._joint_name_to_idx[joint["name"]] = i
 
-        self.log(f"IK chain from '{self.root_component_id}' with {self._num_joints} actuated joints")
+        self.log(f"IK chain from '{self.root_component_id}' to '{self.end_effector_component_id}' with {self._num_joints} actuated joints, {len(self.components)} components, {len(self.joints)} joints")
 
     def _build_chain(
         self,
