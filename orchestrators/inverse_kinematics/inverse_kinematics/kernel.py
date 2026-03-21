@@ -103,6 +103,9 @@ class InverseKinematicsKernel(PolyflowKernel):
         """
         comp_by_id = {c.get("_id", c.get("component_id", "")): c for c in components}
 
+        self.log(f"_build_chain: comp_by_id keys = {list(comp_by_id.keys())}")
+        self.log(f"_build_chain: root_component_id = '{root_component_id}', found = {root_component_id in comp_by_id}")
+
         if not root_component_id or root_component_id not in comp_by_id:
             self.log(f"Root component '{root_component_id}' not found — chain will be empty")
             return []
@@ -116,6 +119,8 @@ class InverseKinematicsKernel(PolyflowKernel):
             if pid not in joints_by_parent:
                 joints_by_parent[pid] = []
             joints_by_parent[pid].append(j)
+
+        self.log(f"_build_chain: joints_by_parent keys = {list(joints_by_parent.keys())}")
 
         # BFS/DFS from base to build ordered chain
         chain = []
