@@ -7,11 +7,6 @@
       "name": "command",
       "direction": "subscribe",
       "msg_type": "std_msgs/Float64"
-    },
-    {
-      "name": "state",
-      "direction": "publish",
-      "msg_type": "polyflow_msgs/MotorState"
     }
   ],
   "services": [],
@@ -19,24 +14,17 @@
   "parameters_schema": {
     "motor_id": {
       "label": "Motor ID",
-      "type": "string",
-      "default": "motor_0",
-      "description": "Identifier for the motor being controlled.",
+      "type": "number",
+      "default": 1,
+      "description": "Motor port ID (1-indexed) on the controller board.",
       "ui": { "group": "Motor", "order": 1 }
-    },
-    "control_mode": {
-      "label": "Control Mode",
-      "type": "enum",
-      "values": ["velocity", "position"],
-      "default": "velocity",
-      "ui": { "group": "Motor", "order": 2 }
     },
     "max_speed": {
       "label": "Max Speed",
       "type": "number",
       "default": 1.0,
       "description": "Maximum allowable speed value.",
-      "ui": { "group": "Motor", "order": 3 }
+      "ui": { "group": "Motor", "order": 2 }
     }
   },
   "defaults": {

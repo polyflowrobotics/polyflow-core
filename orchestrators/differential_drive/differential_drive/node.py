@@ -2,8 +2,7 @@ import asyncio
 
 from std_msgs.msg import Float64
 from geometry_msgs.msg import Twist
-from nav_msgs.msg import Odometry
-from polyflow_msgs.msg import ModeState, EncoderState
+from polyflow_msgs.msg import ModeState
 from common.polyflow_node import PolyflowNode
 from differential_drive.kernel import DifferentialDriveKernel
 
@@ -19,15 +18,12 @@ class DifferentialDriveNode(PolyflowNode):
         # Register input pins
         self.register_input_pin("cmd_vel", Twist)
         self.register_input_pin("mode", ModeState)
-        self.register_input_pin("encoder_left", EncoderState)
-        self.register_input_pin("encoder_right", EncoderState)
 
         # Register output pins
         self.register_output_pin("front_left_motor", Float64)
         self.register_output_pin("rear_left_motor", Float64)
         self.register_output_pin("front_right_motor", Float64)
         self.register_output_pin("rear_right_motor", Float64)
-        self.register_output_pin("odometry", Odometry)
 
         self.get_logger().info(
             f"DifferentialDrive | wheel_radius={self.kernel.wheel_radius} | "

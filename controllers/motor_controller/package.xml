@@ -2,7 +2,7 @@
 <package format="3">
   <name>motor_controller</name>
   <version>0.0.1</version>
-  <description>Generic motor controller node for Polyflow robots</description>
+  <description>Generic motor controller node that sends PRP hardware commands</description>
 
   <maintainer email="drew@polyflowrobotics.com">Drew Swinney</maintainer>
   <license>MIT</license>
@@ -11,7 +11,6 @@
 
   <depend>rclpy</depend>
   <depend>std_msgs</depend>
-  <depend>polyflow_msgs</depend>
   <depend>common</depend>
 
   <exec_depend>ros2launch</exec_depend>

@@ -49,7 +49,7 @@ class InverseKinematicsKernel(PolyflowKernel):
         joint_commands — {"positions": [float, ...]}  (solved joint angles)
 
     Parameters:
-        root_component_id: string — _id of the root component for this chain
+        root_component_id:    string — _id of the root component for this chain
                            (e.g. "front_left_hip"). The chain is built by walking
                            joints downward from this component to the end-effector.
         components:     RobotComponent[] — auto-injected by studio (hidden).

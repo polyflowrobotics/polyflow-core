@@ -14,16 +14,6 @@
       "msg_type": "polyflow_msgs/ModeState"
     },
     {
-      "name": "encoder_left",
-      "direction": "subscribe",
-      "msg_type": "polyflow_msgs/EncoderState"
-    },
-    {
-      "name": "encoder_right",
-      "direction": "subscribe",
-      "msg_type": "polyflow_msgs/EncoderState"
-    },
-    {
       "name": "front_left_motor",
       "direction": "publish",
       "msg_type": "std_msgs/Float64"
@@ -42,11 +32,6 @@
       "name": "rear_right_motor",
       "direction": "publish",
       "msg_type": "std_msgs/Float64"
-    },
-    {
-      "name": "odometry",
-      "direction": "publish",
-      "msg_type": "nav_msgs/Odometry"
     }
   ],
   "services": [],

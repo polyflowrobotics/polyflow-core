@@ -18,7 +18,7 @@ class ODriveS1Kernel(PolyflowKernel):
     """
 
     def setup(self):
-        self.joint_id = self.get_param("joint")
+        self.joint_id = self.get_param("joint_id")
         self.control_mode = "position"
 
         # Gear ratio: motor_turns = output_turns * gear_ratio
