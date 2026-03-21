@@ -74,12 +74,6 @@ class InverseKinematicsKernel(PolyflowKernel):
         self.tolerance = float(self.get_param("tolerance", 0.001))
         self.damping = float(self.get_param("damping", 0.01))
 
-        self.log(f"IK setup: root={self.root_component_id}, {len(self.components)} components, {len(self.joints)} joints")
-        for c in self.components:
-            self.log(f"  component: _id={c.get('_id')}, component_id={c.get('component_id')}, name={c.get('name')}")
-        for j in self.joints:
-            self.log(f"  joint: name={j.get('name')}, parent={j.get('parent')}, child={j.get('child')}, type={j.get('joint_type')}")
-
         self._chain = self._build_chain(self.root_component_id, self.components, self.joints)
         self._num_joints = len(self._chain)
         self._current_joint_positions: Optional[List[float]] = None
@@ -290,11 +284,12 @@ class InverseKinematicsKernel(PolyflowKernel):
 
         orient = target.get("orientation")
         target_quat = None
-        if orient and any(orient.get(k, 0) != 0 for k in ("x", "y", "z", "w")):
-            target_quat = np.array([
-                orient.get("x", 0), orient.get("y", 0),
-                orient.get("z", 0), orient.get("w", 1),
-            ])
+        if orient:
+            # Only enable orientation tracking if a non-identity quaternion is provided
+            x, y, z, w = orient.get("x", 0), orient.get("y", 0), orient.get("z", 0), orient.get("w", 1)
+            is_identity = abs(x) < 1e-6 and abs(y) < 1e-6 and abs(z) < 1e-6 and abs(w - 1) < 1e-6
+            if not is_identity:
+                target_quat = np.array([x, y, z, w])
 
         lam2 = self.damping ** 2
 
