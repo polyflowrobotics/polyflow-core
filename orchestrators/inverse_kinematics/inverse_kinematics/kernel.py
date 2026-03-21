@@ -316,7 +316,8 @@ class InverseKinematicsKernel(PolyflowKernel):
             q = self._clamp_joints(q)
 
         self.log(f"IK did not converge after {self.max_iterations} iterations (err={pos_err_norm:.6f})")
-        return None
+        # Return best effort solution — for interactive dragging, partial progress is better than nothing
+        return self._clamp_joints(q).tolist()
 
     def process_input(self, pin_id: str, data: dict):
         if not self.should_run(trigger_info={"pin_id": pin_id}):
