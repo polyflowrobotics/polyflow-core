@@ -1,0 +1,71 @@
+{
+  "type": "orchestrator",
+  "name": "Inverse Kinematics",
+  "entry_point": "inverse_kinematics/node.py",
+  "topics": [
+    {
+      "name": "target_pose",
+      "direction": "subscribe",
+      "msg_type": "geometry_msgs/Pose"
+    },
+    {
+      "name": "joint_states",
+      "direction": "subscribe",
+      "msg_type": "sensor_msgs/JointState"
+    },
+    {
+      "name": "joint_commands",
+      "direction": "publish",
+      "msg_type": "trajectory_msgs/JointTrajectoryPoint"
+    }
+  ],
+  "services": [],
+  "actions": [],
+  "parameters_schema": {
+    "root_component_id": {
+      "label": "Root Component",
+      "type": "RobotComponent",
+      "default": "",
+      "description": "The root component of the kinematic chain (e.g. hip, shoulder). The solver walks downward from here to the end-effector.",
+      "ui": { "group": "Chain", "order": 1 }
+    },
+    "components": {
+      "label": "Robot Components",
+      "type": "RobotComponent[]",
+      "default": [],
+      "description": "Auto-injected from Robot.components on deployment.",
+      "ui": { "hidden": true }
+    },
+    "joints": {
+      "label": "Robot Joints",
+      "type": "Joint[]",
+      "default": [],
+      "description": "Auto-injected from Robot.joints on deployment.",
+      "ui": { "hidden": true }
+    },
+    "max_iterations": {
+      "label": "Max Solver Iterations",
+      "type": "number",
+      "default": 100,
+      "description": "Maximum number of iterations for the IK solver.",
+      "ui": { "group": "Solver", "order": 1 }
+    },
+    "tolerance": {
+      "label": "Position Tolerance (m)",
+      "type": "number",
+      "default": 0.001,
+      "description": "Target position tolerance in meters.",
+      "ui": { "group": "Solver", "order": 2 }
+    },
+    "damping": {
+      "label": "Damping Factor",
+      "type": "number",
+      "default": 0.01,
+      "description": "Damping factor (λ) for the damped least-squares solver. Higher values improve stability near singularities.",
+      "ui": { "group": "Solver", "order": 3 }
+    }
+  },
+  "defaults": {
+    "rate_hz": 50
+  }
+}

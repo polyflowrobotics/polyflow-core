@@ -1,0 +1,26 @@
+[project]
+name = "inverse_kinematics"
+version = "0.1.0"
+description = "Polyflow inverse kinematics orchestrator node"
+license = "MIT"
+authors = [
+    {name = "Drew Swinney", email = "drew@polyflowrobotics.com"},
+]
+maintainers = [
+    {name = "Drew Swinney", email = "drew@polyflowrobotics.com"},
+]
+dependencies = ["setuptools"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+
+[tool.setuptools.data-files]
+"share/ament_index/resource_index/packages" = ["resource/inverse_kinematics"]
+"share/inverse_kinematics" = ["package.xml"]
+
+[project.scripts]
+inverse_kinematics_node = "inverse_kinematics.node:main"
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
