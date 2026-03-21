@@ -143,9 +143,9 @@ class InverseKinematicsKernel(PolyflowKernel):
         # Extract actuated joints along the path
         chain = []
         for joint in path_joints:
-            joint_type = joint.get("joint_type", "Fixed")
+            joint_type = joint.get("joint_type", "fixed").lower()
 
-            if joint_type not in ("Revolute", "Continuous", "Prismatic"):
+            if joint_type not in ("revolute", "continuous", "prismatic"):
                 continue
 
             origin = joint.get("origin", {})
@@ -170,7 +170,7 @@ class InverseKinematicsKernel(PolyflowKernel):
             limit = joint.get("limit", {})
             lower = limit.get("lower", -math.pi)
             upper = limit.get("upper", math.pi)
-            if joint_type == "Continuous":
+            if joint_type == "continuous":
                 lower = -math.pi
                 upper = math.pi
 
@@ -205,10 +205,10 @@ class InverseKinematicsKernel(PolyflowKernel):
             T_static = _homogeneous(R_static, joint["origin_translation"])
 
             # Joint actuation
-            if joint["type"] in ("Revolute", "Continuous"):
+            if joint["type"] in ("revolute", "continuous"):
                 R_joint = _rotation_matrix(joint["axis"], q[i])
                 T_joint = _homogeneous(R_joint, np.zeros(3))
-            elif joint["type"] == "Prismatic":
+            elif joint["type"] == "prismatic":
                 T_joint = _homogeneous(np.eye(3), joint["axis"] * q[i])
             else:
                 T_joint = np.eye(4)
@@ -231,11 +231,11 @@ class InverseKinematicsKernel(PolyflowKernel):
             T_i = transforms[i + 1]
             z_i = T_i[:3, :3] @ joint["axis"]
 
-            if joint["type"] in ("Revolute", "Continuous"):
+            if joint["type"] in ("revolute", "continuous"):
                 p_i = T_i[:3, 3]
                 J[:3, i] = np.cross(z_i, p_ee - p_i)
                 J[3:, i] = z_i
-            elif joint["type"] == "Prismatic":
+            elif joint["type"] == "prismatic":
                 J[:3, i] = z_i
 
         return J
