@@ -322,6 +322,7 @@ class ODriveS1Controller(PolyflowNode):
 
         # Register typed pins (using String for complex JSON protocol)
         self.register_input_pin("trajectory", String)
+        self.register_input_pin("mode", String)
         self.register_output_pin("joint_state", String)
 
         rate_hz = self.configuration.get("rate_hz", 50)
@@ -347,13 +348,16 @@ class ODriveS1Controller(PolyflowNode):
         """Route kernel emissions to hardware or ROS publishers."""
         if pin_id == "hw_command":
             self._apply_hw_command(data)
-        else:
-            # Default: convert dict to ROS msg and publish
-            from common.polyflow_node import _dict_to_ros_msg
-            msg_type = self._output_pin_types.get(pin_id)
-            if msg_type:
-                ros_msg = _dict_to_ros_msg(data, msg_type)
-                self.publish_to_pin(pin_id, ros_msg)
+            return
+        if pin_id == "state" and isinstance(data, dict) and "control_mode" in data:
+            self._apply_control_mode(data["control_mode"])
+            return
+        # Default: convert dict to ROS msg and publish
+        from common.polyflow_node import _dict_to_ros_msg
+        msg_type = self._output_pin_types.get(pin_id)
+        if msg_type:
+            ros_msg = _dict_to_ros_msg(data, msg_type)
+            self.publish_to_pin(pin_id, ros_msg)
 
     def _apply_hw_command(self, cmd: dict) -> None:
         """Apply a processed command from the kernel to the hardware axis."""
@@ -375,6 +379,34 @@ class ODriveS1Controller(PolyflowNode):
             self.get_logger().debug(f"Set {mode} for {joint_id}: {cmd['value']} (scaled={scaled})")
         except Exception as exc:
             self.get_logger().error(f"Failed to apply command for {joint_id}: {exc}")
+
+    def _apply_control_mode(self, mode: str) -> None:
+        """Reconfigure the ODrive hardware controller mode at runtime."""
+        axis = self.axes.get(self.kernel.joint_id)
+        if axis is None:
+            return
+
+        try:
+            if isinstance(axis, CANSimpleAxis):
+                if mode == "velocity":
+                    axis.set_controller_mode(axis.CONTROL_MODE_VELOCITY_CONTROL, axis.INPUT_MODE_PASSTHROUGH)
+                elif mode == "torque":
+                    axis.set_controller_mode(axis.CONTROL_MODE_TORQUE_CONTROL, axis.INPUT_MODE_PASSTHROUGH)
+                else:
+                    axis.set_controller_mode(axis.CONTROL_MODE_POSITION_CONTROL, axis.INPUT_MODE_PASSTHROUGH)
+            else:
+                # USB transport — axis has odrive.enums on its config
+                from odrive.enums import ControlMode, InputMode  # type: ignore
+                if mode == "velocity":
+                    axis.controller.config.control_mode = ControlMode.VELOCITY_CONTROL
+                elif mode == "torque":
+                    axis.controller.config.control_mode = ControlMode.TORQUE_CONTROL
+                else:
+                    axis.controller.config.control_mode = ControlMode.POSITION_CONTROL
+                axis.controller.config.input_mode = InputMode.PASSTHROUGH
+            self.get_logger().info(f"Control mode changed to {mode} for {self.kernel.joint_id}")
+        except Exception as exc:
+            self.get_logger().error(f"Failed to set control mode to {mode}: {exc}")
 
     def register_axis(self, joint_id: str, axis: Any) -> None:
         self.axes[joint_id] = axis

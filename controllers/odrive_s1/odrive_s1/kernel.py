@@ -19,7 +19,7 @@ class ODriveS1Kernel(PolyflowKernel):
 
     def setup(self):
         self.joint_id = self.get_param("joint")
-        self.control_mode = self.get_param("control_mode", "position")
+        self.control_mode = "position"
 
         # Gear ratio: motor_turns = output_turns * gear_ratio
         gear_ratio = float(self.get_param("gear_ratio", 1.0))
@@ -69,6 +69,14 @@ class ODriveS1Kernel(PolyflowKernel):
         return round(value / float(step)) * float(step)
 
     def process_input(self, pin_id: str, data: dict):
+        if pin_id == "mode":
+            # std_msgs/String format: {"data": "position"}
+            raw = data.get("data") if isinstance(data, dict) else None
+            if isinstance(raw, str) and raw.strip() in ("position", "velocity", "torque"):
+                self.control_mode = raw.strip()
+                self.emit("state", {"control_mode": self.control_mode})
+            return
+
         if not self.should_run(trigger_info={'pin_id': pin_id}):
             return
 
