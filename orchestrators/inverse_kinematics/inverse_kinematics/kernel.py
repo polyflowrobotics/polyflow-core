@@ -74,6 +74,12 @@ class InverseKinematicsKernel(PolyflowKernel):
         self.tolerance = float(self.get_param("tolerance", 0.001))
         self.damping = float(self.get_param("damping", 0.01))
 
+        self.log(f"IK setup: root={self.root_component_id}, {len(self.components)} components, {len(self.joints)} joints")
+        for c in self.components:
+            self.log(f"  component: _id={c.get('_id')}, component_id={c.get('component_id')}, name={c.get('name')}")
+        for j in self.joints:
+            self.log(f"  joint: name={j.get('name')}, parent={j.get('parent')}, child={j.get('child')}, type={j.get('joint_type')}")
+
         self._chain = self._build_chain(self.root_component_id, self.components, self.joints)
         self._num_joints = len(self._chain)
         self._current_joint_positions: Optional[List[float]] = None
@@ -333,10 +339,12 @@ class InverseKinematicsKernel(PolyflowKernel):
                     self._current_joint_positions = list(combined)
 
         elif pin_id == "target_pose":
+            self.log(f"target_pose received: chain={self._num_joints} joints, data={data}")
             if self._current_joint_positions is None:
                 self._current_joint_positions = [0.0] * self._num_joints
 
             solution = self._solve_ik(data, self._current_joint_positions)
+            self.log(f"IK solution: {solution}")
             if solution is not None:
                 joint_names = [joint["name"] for joint in self._chain]
                 self.emit("joint_commands", {
