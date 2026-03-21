@@ -119,12 +119,22 @@ class InverseKinematicsKernel(PolyflowKernel):
 
         # BFS from root to end-effector, tracking the path
         from collections import deque
+
+        self._debug_log = []
+        self._debug_log.append(f"BFS: root={repr(root_component_id)} ee={repr(end_effector_component_id)}")
+        self._debug_log.append(f"BFS: joints_by_parent keys={[repr(k) for k in joints_by_parent.keys()]}")
+        self._debug_log.append(f"BFS: root in joints_by_parent={root_component_id in joints_by_parent}")
+        if root_component_id in joints_by_parent:
+            for j in joints_by_parent[root_component_id]:
+                self._debug_log.append(f"BFS: root joint child={repr(j.get('child'))}")
+
         queue: deque = deque([(root_component_id, [])])
         visited = {root_component_id}
         path_joints: Optional[List[Dict[str, Any]]] = None
 
         while queue:
             comp_id, path = queue.popleft()
+            self._debug_log.append(f"BFS visiting: {repr(comp_id)}, path_len={len(path)}")
 
             if comp_id == end_effector_component_id:
                 path_joints = path
