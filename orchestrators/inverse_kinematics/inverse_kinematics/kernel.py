@@ -174,8 +174,11 @@ class InverseKinematicsKernel(PolyflowKernel):
             axis = np.array([
                 axis_raw.get("x", 0),
                 axis_raw.get("y", 0),
-                axis_raw.get("z", 1),
+                axis_raw.get("z", 0),
             ], dtype=float)
+            # If axis is all zeros (sparse object with no matching keys), default to Z
+            if np.linalg.norm(axis) < 1e-9:
+                axis = np.array([0, 0, 1], dtype=float)
 
             limit = joint.get("limit", {})
             lower = limit.get("lower", -math.pi)
