@@ -16,7 +16,7 @@
     {
       "name": "trajectory",
       "direction": "subscribe",
-      "msg_type": "trajectory_msgs/JointTrajectory",
+      "msg_type": "trajectory_msgs/JointTrajectoryPoint",
       "qos": {
         "reliability": "reliable",
         "history": "keep_last",
