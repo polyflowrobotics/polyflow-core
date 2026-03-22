@@ -380,10 +380,12 @@ class InverseKinematicsKernel(PolyflowKernel):
             ee_pos = fk_transforms[-1][:3, 3]
             pos = data.get("position", {})
             target_pos = [pos.get("x", 0), pos.get("y", 0), pos.get("z", 0)]
-            self.log(f"FK end-effector pos: [{ee_pos[0]:.4f}, {ee_pos[1]:.4f}, {ee_pos[2]:.4f}]")
-            self.log(f"Target pos: [{target_pos[0]:.4f}, {target_pos[1]:.4f}, {target_pos[2]:.4f}]")
-            self.log(f"Current joint angles: {self._current_joint_positions}")
-            self.log(f"Chain origins: {[list(j['origin_translation']) for j in self._chain]}")
+            self.log(f"FK end-effector pos (m): [{ee_pos[0]:.4f}, {ee_pos[1]:.4f}, {ee_pos[2]:.4f}]")
+            self.log(f"Target pos (m): [{target_pos[0]:.4f}, {target_pos[1]:.4f}, {target_pos[2]:.4f}]")
+            self.log(f"Current joint angles (rad): {[f'{a:.4f}' for a in self._current_joint_positions]}")
+            self.log(f"Chain details:")
+            for i, j in enumerate(self._chain):
+                self.log(f"  [{i}] {j['name']} type={j['type']} axis={list(j['axis'])} origin_t={[f'{v:.4f}' for v in j['origin_translation']]} origin_r={[f'{v:.4f}' for v in j['origin_rotation']]}")
 
             solution = self._solve_ik(data, self._current_joint_positions)
             self.log(f"IK solution: {solution}")
