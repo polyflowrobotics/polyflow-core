@@ -161,15 +161,10 @@ class InverseKinematicsKernel(PolyflowKernel):
                 continue
 
             origin = joint.get("origin", {})
-            child_input = joint.get("child_input_origin", {})
-            # The full joint transform is: parent output origin - child input origin.
-            # The output origin is where the joint is in the parent component frame.
-            # The child input origin is where the connector is in the child component frame.
-            # Subtracting the child input gives the offset from joint to child link origin.
             translation = np.array([
-                origin.get("x", 0) - child_input.get("x", 0),
-                origin.get("y", 0) - child_input.get("y", 0),
-                origin.get("z", 0) - child_input.get("z", 0),
+                origin.get("x", 0),
+                origin.get("y", 0),
+                origin.get("z", 0),
             ], dtype=float)
             rotation_euler = np.array([
                 origin.get("rx", 0),
