@@ -371,9 +371,19 @@ class InverseKinematicsKernel(PolyflowKernel):
                     self._current_joint_positions = list(combined)
 
         elif pin_id == "target_pose":
-            self.log(f"target_pose received: chain={self._num_joints} joints, data={data}")
             if self._current_joint_positions is None:
                 self._current_joint_positions = [0.0] * self._num_joints
+
+            # Debug: log current FK end-effector position vs target
+            q_current = np.array(self._current_joint_positions, dtype=float)
+            fk_transforms = self._forward_kinematics(q_current)
+            ee_pos = fk_transforms[-1][:3, 3]
+            pos = data.get("position", {})
+            target_pos = [pos.get("x", 0), pos.get("y", 0), pos.get("z", 0)]
+            self.log(f"FK end-effector pos: [{ee_pos[0]:.4f}, {ee_pos[1]:.4f}, {ee_pos[2]:.4f}]")
+            self.log(f"Target pos: [{target_pos[0]:.4f}, {target_pos[1]:.4f}, {target_pos[2]:.4f}]")
+            self.log(f"Current joint angles: {self._current_joint_positions}")
+            self.log(f"Chain origins: {[list(j['origin_translation']) for j in self._chain]}")
 
             solution = self._solve_ik(data, self._current_joint_positions)
             self.log(f"IK solution: {solution}")
