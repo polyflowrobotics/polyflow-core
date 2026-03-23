@@ -161,16 +161,18 @@ class InverseKinematicsKernel(PolyflowKernel):
                 continue
 
             origin = joint.get("origin", {})
+            # Origin translations are stored in mm — convert to meters for FK.
             translation = np.array([
                 origin.get("x", 0),
                 origin.get("y", 0),
                 origin.get("z", 0),
-            ], dtype=float)
-            rotation_euler = np.array([
+            ], dtype=float) / 1000.0
+            # Origin rotations are stored in degrees — convert to radians.
+            rotation_euler = np.radians(np.array([
                 origin.get("rx", 0),
                 origin.get("ry", 0),
                 origin.get("rz", 0),
-            ], dtype=float)
+            ], dtype=float))
 
             axis_raw = joint.get("axis", {"x": 0, "y": 0, "z": 1})
             axis = np.array([
@@ -183,11 +185,15 @@ class InverseKinematicsKernel(PolyflowKernel):
                 axis = np.array([0, 0, 1], dtype=float)
 
             limit = joint.get("limit", {})
-            lower = limit.get("lower", -math.pi)
-            upper = limit.get("upper", math.pi)
-            if joint_type == "continuous":
+            # Limits are stored in degrees — convert to radians.
+            lower_raw = limit.get("lower_position", limit.get("lower", None))
+            upper_raw = limit.get("upper_position", limit.get("upper", None))
+            if joint_type == "continuous" or (lower_raw is None and upper_raw is None):
                 lower = -math.pi
                 upper = math.pi
+            else:
+                lower = math.radians(lower_raw) if lower_raw is not None else -math.pi
+                upper = math.radians(upper_raw) if upper_raw is not None else math.pi
 
             child_id = joint.get("child", "")
             child_comp = comp_by_id.get(child_id, {})
