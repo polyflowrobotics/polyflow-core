@@ -160,19 +160,43 @@ class InverseKinematicsKernel(PolyflowKernel):
             if joint_type not in ("revolute", "continuous", "prismatic"):
                 continue
 
+            # Output (parent-side) origin — positions the joint frame relative to the parent body.
+            # The logic worker already converts origin translations from mm to meters
+            # before injecting them as parameters, so use them directly.
             origin = joint.get("origin", {})
-            # Origin translations are stored in mm — convert to meters for FK.
             translation = np.array([
                 origin.get("x", 0),
                 origin.get("y", 0),
                 origin.get("z", 0),
-            ], dtype=float) / 1000.0
-            # Origin rotations are stored in degrees — convert to radians.
-            rotation_euler = np.radians(np.array([
+            ], dtype=float)
+            rotation_euler = np.array([
                 origin.get("rx", 0),
                 origin.get("ry", 0),
                 origin.get("rz", 0),
-            ], dtype=float))
+            ], dtype=float)
+
+            # Child input origin — offset from the joint pivot to the child body frame.
+            # Look up the child component's input connector that this joint connects to.
+            child_id = joint.get("child", "")
+            child_input_id = joint.get("child_input", "")
+            child_comp = comp_by_id.get(child_id, {})
+            child_input_origin = np.zeros(3)
+            child_input_rotation = np.zeros(3)
+            if child_input_id:
+                for inp in child_comp.get("inputs", []):
+                    if inp.get("_id") == child_input_id:
+                        inp_origin = inp.get("origin", {})
+                        child_input_origin = np.array([
+                            inp_origin.get("x", 0),
+                            inp_origin.get("y", 0),
+                            inp_origin.get("z", 0),
+                        ], dtype=float) / 1000.0  # mm → meters
+                        child_input_rotation = np.array([
+                            inp_origin.get("rx", 0),
+                            inp_origin.get("ry", 0),
+                            inp_origin.get("rz", 0),
+                        ], dtype=float)
+                        break
 
             axis_raw = joint.get("axis", {"x": 0, "y": 0, "z": 1})
             axis = np.array([
@@ -195,8 +219,6 @@ class InverseKinematicsKernel(PolyflowKernel):
                 lower = math.radians(lower_raw) if lower_raw is not None else -math.pi
                 upper = math.radians(upper_raw) if upper_raw is not None else math.pi
 
-            child_id = joint.get("child", "")
-            child_comp = comp_by_id.get(child_id, {})
             # Use _id (output ID) as the canonical joint identifier —
             # downstream controllers (e.g. ODrive) match on this, not display name.
             joint_id = joint.get("_id", joint.get("parent_output", ""))
@@ -207,6 +229,8 @@ class InverseKinematicsKernel(PolyflowKernel):
                 "axis": axis,
                 "origin_translation": translation,
                 "origin_rotation": rotation_euler,
+                "child_input_translation": child_input_origin,
+                "child_input_rotation": child_input_rotation,
                 "lower": lower,
                 "upper": upper,
             })
@@ -215,19 +239,32 @@ class InverseKinematicsKernel(PolyflowKernel):
 
     def _forward_kinematics(self, q: np.ndarray) -> List[np.ndarray]:
         """
-        Compute forward kinematics for all joints.
-
-        Each joint's origin (translation + Euler rotation) positions the joint
-        frame relative to the parent. The joint variable then actuates about
-        the joint axis.
+        Compute forward kinematics, returning body-frame transforms.
 
         Returns a list of 4x4 homogeneous transforms (len = num_joints + 1).
+        transforms[0] = root body, transforms[i+1] = child body after joint i.
         """
-        transforms = [np.eye(4)]
+        body_transforms, _ = self._fk_full(q)
+        return body_transforms
+
+    def _fk_full(self, q: np.ndarray):
+        """
+        Compute both body-frame and joint-pivot-frame transforms in a single pass.
+
+        For each joint the chain is:
+          parent body → T_output → T_joint → (pivot frame) → T_input_inv → child body
+
+        Returns:
+          body_transforms: list of 4x4 transforms (len = num_joints + 1)
+          pivot_frames:    list of 4x4 transforms (len = num_joints)
+        """
+        body_transforms = [np.eye(4)]
+        pivot_frames = []
+
         for i, joint in enumerate(self._chain):
-            # Static transform from parent to joint frame (from joint origin)
-            R_static = _euler_to_rotation(*joint["origin_rotation"])
-            T_static = _homogeneous(R_static, joint["origin_translation"])
+            # Output origin: parent body → joint pivot
+            R_output = _euler_to_rotation(*joint["origin_rotation"])
+            T_output = _homogeneous(R_output, joint["origin_translation"])
 
             # Joint actuation
             if joint["type"] in ("revolute", "continuous"):
@@ -238,8 +275,22 @@ class InverseKinematicsKernel(PolyflowKernel):
             else:
                 T_joint = np.eye(4)
 
-            transforms.append(transforms[-1] @ T_static @ T_joint)
-        return transforms
+            T_pivot = body_transforms[-1] @ T_output @ T_joint
+            pivot_frames.append(T_pivot)
+
+            # Child input origin: joint pivot → child body (inverted)
+            child_t = joint["child_input_translation"]
+            child_r = joint["child_input_rotation"]
+            if np.linalg.norm(child_t) > 1e-9 or np.linalg.norm(child_r) > 1e-9:
+                R_input = _euler_to_rotation(*child_r)
+                T_input = _homogeneous(R_input, child_t)
+                T_input_inv = np.linalg.inv(T_input)
+            else:
+                T_input_inv = np.eye(4)
+
+            body_transforms.append(T_pivot @ T_input_inv)
+
+        return body_transforms, pivot_frames
 
     def _compute_jacobian(self, q: np.ndarray) -> np.ndarray:
         """
@@ -247,17 +298,19 @@ class InverseKinematicsKernel(PolyflowKernel):
 
         For revolute joints:  J_i = [z_i × (p_ee - p_i); z_i]
         For prismatic joints: J_i = [z_i; 0]
+
+        Uses the joint pivot frames (before child input offset) for positions/axes.
         """
-        transforms = self._forward_kinematics(q)
-        p_ee = transforms[-1][:3, 3]
+        body_transforms, pivot_frames = self._fk_full(q)
+        p_ee = body_transforms[-1][:3, 3]
 
         J = np.zeros((6, self._num_joints))
         for i, joint in enumerate(self._chain):
-            T_i = transforms[i + 1]
-            z_i = T_i[:3, :3] @ joint["axis"]
+            T_pivot = pivot_frames[i]
+            z_i = T_pivot[:3, :3] @ joint["axis"]
 
             if joint["type"] in ("revolute", "continuous"):
-                p_i = T_i[:3, 3]
+                p_i = T_pivot[:3, 3]
                 J[:3, i] = np.cross(z_i, p_ee - p_i)
                 J[3:, i] = z_i
             elif joint["type"] == "prismatic":
@@ -391,7 +444,7 @@ class InverseKinematicsKernel(PolyflowKernel):
             self.log(f"Current joint angles (rad): {[f'{a:.4f}' for a in self._current_joint_positions]}")
             self.log(f"Chain details:")
             for i, j in enumerate(self._chain):
-                self.log(f"  [{i}] {j['name']} type={j['type']} axis={list(j['axis'])} origin_t={[f'{v:.4f}' for v in j['origin_translation']]} origin_r={[f'{v:.4f}' for v in j['origin_rotation']]}")
+                self.log(f"  [{i}] {j['name']} type={j['type']} axis={list(j['axis'])} output_t={[f'{v:.4f}' for v in j['origin_translation']]} output_r={[f'{v:.4f}' for v in j['origin_rotation']]} input_t={[f'{v:.4f}' for v in j['child_input_translation']]} input_r={[f'{v:.4f}' for v in j['child_input_rotation']]}")
 
             solution = self._solve_ik(data, self._current_joint_positions)
             self.log(f"IK solution: {solution}")
