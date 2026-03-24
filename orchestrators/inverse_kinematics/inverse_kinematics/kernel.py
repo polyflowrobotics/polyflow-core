@@ -3,6 +3,7 @@ from collections import deque
 from typing import Any, Dict, List, Optional
 
 import numpy as np
+from scipy.optimize import least_squares
 
 from common.polyflow_kernel import PolyflowKernel
 
@@ -17,21 +18,6 @@ def _euler_to_rotation(rx: float, ry: float, rz: float) -> np.ndarray:
         [sx*sy*cz + cx*sz, -sx*sy*sz + cx*cz, -sx*cy],
         [-cx*sy*cz + sx*sz, cx*sy*sz + sx*cz, cx*cy],
     ])
-
-
-def _rotation_to_rpy(R: np.ndarray) -> np.ndarray:
-    """Extract roll-pitch-yaw (XYZ intrinsic) from a 3x3 rotation matrix."""
-    sy = R[0, 2]
-    sy = np.clip(sy, -1, 1)
-    pitch = math.asin(sy)
-    if abs(abs(sy) - 1) < 1e-6:
-        # Gimbal lock
-        roll = math.atan2(-R[1, 2], R[1, 1])
-        yaw = 0.0
-    else:
-        roll = math.atan2(-R[1, 2], R[2, 2])
-        yaw = math.atan2(-R[0, 1], R[0, 0])
-    return np.array([roll, pitch, yaw])
 
 
 def _align_x_to(direction: np.ndarray) -> np.ndarray:
@@ -61,11 +47,13 @@ def _homogeneous(R: np.ndarray, t: np.ndarray) -> np.ndarray:
 
 class InverseKinematicsKernel(PolyflowKernel):
     """
-    IK solver using ikpy for robust inverse kinematics.
+    IK solver using scipy.optimize.least_squares with PhysX-matching FK.
 
-    Converts the PhysX-style joint geometry into ikpy URDFLink objects,
-    then delegates solving to ikpy's scipy-backed optimizer with
-    built-in regularization.
+    Builds a kinematic chain matching the physics worker's joint geometry:
+        child_body = parent_body @ parentPose @ joint_rot(q) @ inv(childPose)
+
+    Uses scipy's Levenberg-Marquardt/trust-region optimizer with joint-space
+    regularization to find smooth, stable solutions.
 
     Parameters:
         root_component_id, end_effector_component_id, components, joints,
@@ -79,37 +67,33 @@ class InverseKinematicsKernel(PolyflowKernel):
         self.joints: List[Dict[str, Any]] = self.get_param("joints", [])
         self.max_iterations = int(self.get_param("max_iterations", 100))
         self.tolerance = float(self.get_param("tolerance", 0.001))
-        self._regularization = float(self.get_param("regularization", 0.01))
+        self._regularization = float(self.get_param("regularization", 0.1))
 
-        # Build the joint path and ikpy chain
-        self._joint_path = self._find_joint_path()
-        self._joint_ids: List[str] = []
-        self._num_joints = 0
-        self._ikpy_chain = None
-        self._active_mask: List[bool] = []
+        self._chain = self._build_chain()
+        self._num_joints = len(self._chain)
         self._current_joint_positions: Optional[List[float]] = None
 
-        if self._joint_path:
-            self._build_ikpy_chain()
-
-        # Map joint IDs to indices for fan-in state accumulation
+        # Map joint IDs to chain indices for fan-in state accumulation
         self._joint_name_to_idx: Dict[str, int] = {}
-        for i, jid in enumerate(self._joint_ids):
-            self._joint_name_to_idx[jid] = i
+        for i, joint in enumerate(self._chain):
+            if joint.get("_id"):
+                self._joint_name_to_idx[joint["_id"]] = i
+            self._joint_name_to_idx[joint["name"]] = i
 
         self.log(f"IK chain: {self._num_joints} joints from '{self.root_component_id}' to '{self.end_effector_component_id}'")
+        for i, j in enumerate(self._chain):
+            self.log(f"  [{i}] {j['name']} type={j['type']} axis={j['axis'].tolist()}")
 
-        # Dump FK at q=0 for comparison with PhysX
-        if self._ikpy_chain:
-            q_full = np.zeros(len(self._ikpy_chain.links))
-            fk = self._ikpy_chain.forward_kinematics(q_full, full_kinematics=True)
-            self.log("FK at q=0 body positions (ikpy):")
-            for i, T in enumerate(fk):
-                p = T[:3, 3]
-                self.log(f"  link[{i}] pos=({p[0]:.6f}, {p[1]:.6f}, {p[2]:.6f})")
+        # Dump FK body positions at q=0 for comparison with PhysX
+        q0 = np.zeros(self._num_joints)
+        fk0 = self._forward_kinematics(q0)
+        self.log("FK at q=0 body positions:")
+        for i, T in enumerate(fk0):
+            p = T[:3, 3]
+            self.log(f"  body[{i}] pos=({p[0]:.6f}, {p[1]:.6f}, {p[2]:.6f})")
 
-    def _find_joint_path(self) -> List[Dict[str, Any]]:
-        """BFS from root to end-effector, returning the list of joints on the path."""
+    def _build_chain(self) -> List[Dict[str, Any]]:
+        """Build kinematic chain via BFS from root to end-effector."""
         comp_by_id = {c.get("_id", c.get("component_id", "")): c for c in self.components}
 
         if not self.root_component_id or self.root_component_id not in comp_by_id:
@@ -126,48 +110,28 @@ class InverseKinematicsKernel(PolyflowKernel):
 
         queue: deque = deque([(self.root_component_id, [])])
         visited = {self.root_component_id}
+        path_joints = None
 
         while queue:
             comp_id, path = queue.popleft()
             if comp_id == self.end_effector_component_id:
-                return path
+                path_joints = path
+                break
             for joint in joints_by_parent.get(comp_id, []):
                 child_id = joint.get("child", "")
                 if child_id and child_id not in visited:
                     visited.add(child_id)
                     queue.append((child_id, path + [joint]))
 
-        self.log("No path from root to end-effector")
-        return []
+        if path_joints is None:
+            self.log("No path from root to end-effector")
+            return []
 
-    def _build_ikpy_chain(self):
-        """Convert PhysX joint geometry to ikpy Chain.
-
-        PhysX FK formula per joint:
-            child = parent @ T_parent_pose @ Rot_x(q) @ inv(T_child_pose)
-        where:
-            T_parent_pose = H(R_output @ alignXTo(axis), output_translation)
-            T_child_pose  = H(R_input  @ alignXTo(axis), input_translation)
-
-        At q=0 the net transform from parent body to child body is:
-            T_link = T_parent_pose @ inv(T_child_pose)
-
-        ikpy wants each link defined as:
-            origin_translation, origin_orientation (RPY), rotation axis
-        We decompose T_link into translation + RPY, and pass the joint axis
-        directly (ikpy rotates around the given axis vector, not X).
-        """
-        from ikpy.chain import Chain
-        from ikpy.link import URDFLink, OriginLink
-
-        comp_by_id = {c.get("_id", c.get("component_id", "")): c for c in self.components}
-
-        links = [OriginLink()]
-        active_mask = [False]  # base link is not active
-        joint_ids = []
-
-        for joint in self._joint_path:
+        chain = []
+        for joint in path_joints:
             joint_type = joint.get("joint_type", "fixed").lower()
+            if joint_type not in ("revolute", "continuous", "prismatic"):
+                continue
 
             # Output (parent-side) origin — already in meters from logic worker
             origin = joint.get("origin", {})
@@ -199,83 +163,98 @@ class InverseKinematicsKernel(PolyflowKernel):
             limit = joint.get("limit", {})
             lower_raw = limit.get("lower_position", limit.get("lower", None))
             upper_raw = limit.get("upper_position", limit.get("upper", None))
-            if joint_type in ("continuous",) or (lower_raw is None and upper_raw is None):
+            if joint_type == "continuous" or (lower_raw is None and upper_raw is None):
                 lower, upper = -math.pi, math.pi
             else:
                 lower = math.radians(lower_raw) if lower_raw is not None else -math.pi
                 upper = math.radians(upper_raw) if upper_raw is not None else math.pi
 
-            # Compute net link transform at q=0: T_link = T_parent_pose @ inv(T_child_pose)
+            # Pre-compute parent and child pose transforms (matching PhysX exactly)
             R_align = _align_x_to(axis)
             T_parent_pose = _homogeneous(output_r @ R_align, output_t)
             T_child_pose = _homogeneous(input_r @ R_align, input_t)
-            T_link = T_parent_pose @ np.linalg.inv(T_child_pose)
-
-            link_translation = T_link[:3, 3]
-            link_rpy = _rotation_to_rpy(T_link[:3, :3])
+            T_child_pose_inv = np.linalg.inv(T_child_pose)
 
             joint_id = joint.get("_id", joint.get("parent_output", ""))
-            name = joint.get("name", child_comp.get("name", "unnamed"))
+            chain.append({
+                "_id": joint_id,
+                "name": joint.get("name", child_comp.get("name", "unnamed")),
+                "type": joint_type,
+                "axis": axis,
+                "lower": lower,
+                "upper": upper,
+                "T_parent_pose": T_parent_pose,
+                "T_child_pose_inv": T_child_pose_inv,
+            })
 
-            is_active = joint_type in ("revolute", "continuous", "prismatic")
+        return chain
 
-            if is_active:
-                rotation_axis = axis if joint_type != "prismatic" else None
-                translation_axis = axis if joint_type == "prismatic" else None
+    def _forward_kinematics(self, q: np.ndarray) -> List[np.ndarray]:
+        """FK matching PhysX articulation exactly.
+        Returns body transforms [root, child0, child1, ...]."""
+        transforms = [np.eye(4)]
+        for i, joint in enumerate(self._chain):
+            if joint["type"] in ("revolute", "continuous"):
+                c, s = math.cos(q[i]), math.sin(q[i])
+                T_joint = np.array([
+                    [1, 0, 0, 0],
+                    [0, c, -s, 0],
+                    [0, s, c, 0],
+                    [0, 0, 0, 1],
+                ])
+            elif joint["type"] == "prismatic":
+                T_joint = np.eye(4)
+                T_joint[0, 3] = q[i]
             else:
-                rotation_axis = None
-                translation_axis = None
+                T_joint = np.eye(4)
 
-            self.log(f"  link '{name}': t=({link_translation[0]:.6f}, {link_translation[1]:.6f}, {link_translation[2]:.6f}) "
-                     f"rpy=({link_rpy[0]:.4f}, {link_rpy[1]:.4f}, {link_rpy[2]:.4f}) "
-                     f"axis={axis.tolist()} type={joint_type} bounds=({lower:.3f}, {upper:.3f})")
+            T_child = transforms[-1] @ joint["T_parent_pose"] @ T_joint @ joint["T_child_pose_inv"]
+            transforms.append(T_child)
+        return transforms
 
-            links.append(URDFLink(
-                name=name,
-                origin_translation=link_translation,
-                origin_orientation=link_rpy,
-                rotation=rotation_axis,
-                translation=translation_axis,
-                bounds=(lower, upper),
-                use_symbolic_matrix=False,
-            ))
-            active_mask.append(is_active)
-
-            if is_active:
-                joint_ids.append(joint_id)
-
-        self._ikpy_chain = Chain(
-            links=links,
-            active_links_mask=active_mask,
-            name="ik_chain",
-        )
-        self._joint_ids = joint_ids
-        self._num_joints = len(joint_ids)
-        self._active_mask = active_mask
+    def _ee_position(self, q: np.ndarray) -> np.ndarray:
+        """Get end-effector position for joint angles q."""
+        return self._forward_kinematics(q)[-1][:3, 3]
 
     def get_ee_position(self, joint_angles) -> List[float]:
-        """Return the FK end-effector position [x, y, z] for the given active joint angles.
-        Called from logicWorker for coordinate calibration."""
-        if not self._ikpy_chain:
-            return [0.0, 0.0, 0.0]
-        q = list(joint_angles) if not isinstance(joint_angles, list) else joint_angles
-        q_full = self._joints_to_full(q)
-        fk = self._ikpy_chain.forward_kinematics(q_full)
-        return [float(fk[0, 3]), float(fk[1, 3]), float(fk[2, 3])]
+        """Return FK EE position [x, y, z]. Called from logicWorker for calibration."""
+        q = np.array(list(joint_angles), dtype=float)
+        p = self._ee_position(q)
+        return [float(p[0]), float(p[1]), float(p[2])]
 
-    def _joints_to_full(self, joint_angles: List[float]) -> np.ndarray:
-        """Convert active-only joint angles to full ikpy array (including inactive links)."""
-        full = np.zeros(len(self._active_mask))
-        j = 0
-        for i, active in enumerate(self._active_mask):
-            if active:
-                full[i] = joint_angles[j]
-                j += 1
-        return full
+    def _solve_ik(self, target_pos: np.ndarray, current: List[float]) -> List[float]:
+        """IK solver using scipy.optimize.least_squares with regularization.
 
-    def _full_to_joints(self, full: np.ndarray) -> List[float]:
-        """Extract active joint angles from full ikpy array."""
-        return [float(full[i]) for i, active in enumerate(self._active_mask) if active]
+        Minimizes: ||p_target - FK(q)||^2 + lambda_reg * ||q - q_ref||^2
+        Uses trust-region reflective algorithm for bounded optimization.
+        """
+        q_ref = np.array(current, dtype=float)
+        lower = np.array([j["lower"] for j in self._chain])
+        upper = np.array([j["upper"] for j in self._chain])
+        lam_reg = self._regularization
+
+        def residuals(q):
+            ee = self._ee_position(q)
+            pos_err = target_pos - ee
+            reg_err = math.sqrt(lam_reg) * (q - q_ref)
+            return np.concatenate([pos_err, reg_err])
+
+        result = least_squares(
+            residuals,
+            q_ref,
+            bounds=(lower, upper),
+            method="trf",
+            ftol=self.tolerance * 0.01,
+            xtol=1e-8,
+            gtol=1e-8,
+            max_nfev=self.max_iterations * 10,
+        )
+
+        q_sol = result.x
+        ee_err = np.linalg.norm(target_pos - self._ee_position(q_sol))
+        self.log(f"IK {'converged' if result.success else 'did not converge'} "
+                 f"(nfev={result.nfev}, err={ee_err:.6f}, cost={result.cost:.6f})")
+        return q_sol.tolist()
 
     def process_input(self, pin_id: str, data: dict):
         if not self.should_run(trigger_info={"pin_id": pin_id}):
@@ -299,10 +278,6 @@ class InverseKinematicsKernel(PolyflowKernel):
                     self._current_joint_positions = list(combined)
 
         elif pin_id == "target_pose":
-            if not self._ikpy_chain:
-                self.log("No IK chain built, ignoring target_pose")
-                return
-
             if self._current_joint_positions is None:
                 self._current_joint_positions = [0.0] * self._num_joints
 
@@ -310,33 +285,24 @@ class InverseKinematicsKernel(PolyflowKernel):
             target_pos = np.array([pos.get("x", 0), pos.get("y", 0), pos.get("z", 0)])
 
             # Debug logging
-            q_full = self._joints_to_full(self._current_joint_positions)
-            fk = self._ikpy_chain.forward_kinematics(q_full)
-            ee = fk[:3, 3]
+            q_current = np.array(self._current_joint_positions, dtype=float)
+            ee = self._ee_position(q_current)
             self.log(f"FK EE (m): [{ee[0]:.4f}, {ee[1]:.4f}, {ee[2]:.4f}]")
             self.log(f"Target (m): [{target_pos[0]:.4f}, {target_pos[1]:.4f}, {target_pos[2]:.4f}]")
             self.log(f"Current q (rad): {[f'{a:.4f}' for a in self._current_joint_positions]}")
 
-            # Solve IK using ikpy
-            solution_full = self._ikpy_chain.inverse_kinematics(
-                target_position=target_pos,
-                initial_position=q_full,
-                regularization_parameter=self._regularization,
-            )
-
-            solution = self._full_to_joints(solution_full)
+            solution = self._solve_ik(target_pos, self._current_joint_positions)
 
             # Verify
-            sol_fk = self._ikpy_chain.forward_kinematics(self._joints_to_full(solution))
-            sol_ee = sol_fk[:3, 3]
-            err = np.linalg.norm(target_pos - sol_ee)
+            sol_ee = self._ee_position(np.array(solution))
             self.log(f"Solution: {[f'{a:.4f}' for a in solution]}")
-            self.log(f"FK at solution (m): [{sol_ee[0]:.4f}, {sol_ee[1]:.4f}, {sol_ee[2]:.4f}] (err={err:.6f})")
+            self.log(f"FK at solution (m): [{sol_ee[0]:.4f}, {sol_ee[1]:.4f}, {sol_ee[2]:.4f}]")
 
             # Update current positions so the next solve starts from this solution
             self._current_joint_positions = list(solution)
 
+            joint_ids = [joint["_id"] for joint in self._chain]
             self.emit("joint_commands", {
-                "name": self._joint_ids,
+                "name": joint_ids,
                 "positions": solution,
             })
