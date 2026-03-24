@@ -244,9 +244,9 @@ class InverseKinematicsKernel(PolyflowKernel):
             q_ref,
             bounds=(lower, upper),
             method="trf",
-            ftol=self.tolerance * 0.01,
-            xtol=1e-8,
-            gtol=1e-8,
+            ftol=1e-15,
+            xtol=1e-10,
+            gtol=1e-10,
             max_nfev=self.max_iterations * 10,
         )
 
