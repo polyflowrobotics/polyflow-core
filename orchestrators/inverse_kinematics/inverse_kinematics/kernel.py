@@ -144,15 +144,24 @@ class InverseKinematicsKernel(PolyflowKernel):
             child_comp = comp_by_id.get(child_id, {})
             input_t = np.zeros(3)
             input_r = np.eye(3)
+            input_axis = None
             if child_input_id:
                 for inp in child_comp.get("inputs", []):
                     if inp.get("_id") == child_input_id:
                         io = inp.get("origin", {})
                         input_t = np.array([io.get("x", 0), io.get("y", 0), io.get("z", 0)], dtype=float) / 1000.0
                         input_r = _euler_to_rotation(io.get("rx", 0), io.get("ry", 0), io.get("rz", 0))
+                        # Input connector axis (faces opposite to output axis)
+                        ia = inp.get("axis", None)
+                        if ia:
+                            input_axis = np.array([ia.get("x", 0), ia.get("y", 0), ia.get("z", 0)], dtype=float)
+                            if np.linalg.norm(input_axis) > 1e-9:
+                                input_axis = input_axis / np.linalg.norm(input_axis)
+                            else:
+                                input_axis = None
                         break
 
-            # Joint axis
+            # Joint axis (output axis)
             axis_raw = joint.get("axis", {"x": 0, "y": 0, "z": 1})
             axis = np.array([axis_raw.get("x", 0), axis_raw.get("y", 0), axis_raw.get("z", 0)], dtype=float)
             if np.linalg.norm(axis) < 1e-9:
@@ -169,10 +178,15 @@ class InverseKinematicsKernel(PolyflowKernel):
                 lower = math.radians(lower_raw) if lower_raw is not None else -math.pi
                 upper = math.radians(upper_raw) if upper_raw is not None else math.pi
 
-            # Pre-compute parent and child pose transforms (matching PhysX exactly)
-            R_align = _align_x_to(axis)
-            T_parent_pose = _homogeneous(output_r @ R_align, output_t)
-            T_child_pose = _homogeneous(input_r @ R_align, input_t)
+            # Pre-compute parent and child pose transforms
+            # Parent frame: R_output * alignXTo(outputAxis)
+            R_align_parent = _align_x_to(axis)
+            T_parent_pose = _homogeneous(output_r @ R_align_parent, output_t)
+            # Child frame: R_input * alignXTo(-inputAxis)
+            # The negation accounts for input connectors facing opposite to output
+            child_align_axis = -(input_axis if input_axis is not None else axis)
+            R_align_child = _align_x_to(child_align_axis)
+            T_child_pose = _homogeneous(input_r @ R_align_child, input_t)
             T_child_pose_inv = np.linalg.inv(T_child_pose)
 
             joint_id = joint.get("_id", joint.get("parent_output", ""))
