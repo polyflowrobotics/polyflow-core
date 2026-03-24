@@ -288,17 +288,13 @@ class InverseKinematicsKernel(PolyflowKernel):
             T_pivot = body_transforms[-1] @ T_output @ T_joint
             pivot_frames.append(T_pivot)
 
-            # Child input origin: joint pivot → child body (inverted)
-            child_t = joint["child_input_translation"]
-            child_r = joint["child_input_rotation"]
-            if np.linalg.norm(child_t) > 1e-9 or np.linalg.norm(child_r) > 1e-9:
-                R_input = _euler_to_rotation(*child_r)
-                T_input = _homogeneous(R_input, child_t)
-                T_input_inv = np.linalg.inv(T_input)
-            else:
-                T_input_inv = np.eye(4)
-
-            body_transforms.append(T_pivot @ T_input_inv)
+            # Child input origin: the input connector's offset from the
+            # child body.  The child body sits at (pivot - rotated_input_offset),
+            # mirroring the scene FK's approach.  For now, skip child input
+            # offsets entirely — the output origins already define the joint
+            # positions, and the EE target is relative to the FK EE which
+            # uses the same chain.  The delta approach means offsets cancel.
+            body_transforms.append(T_pivot)
 
         return body_transforms, pivot_frames
 
