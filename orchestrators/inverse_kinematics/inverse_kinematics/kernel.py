@@ -253,6 +253,16 @@ class InverseKinematicsKernel(PolyflowKernel):
         self._num_joints = len(joint_ids)
         self._active_mask = active_mask
 
+    def get_ee_position(self, joint_angles) -> List[float]:
+        """Return the FK end-effector position [x, y, z] for the given active joint angles.
+        Called from logicWorker for coordinate calibration."""
+        if not self._ikpy_chain:
+            return [0.0, 0.0, 0.0]
+        q = list(joint_angles) if not isinstance(joint_angles, list) else joint_angles
+        q_full = self._joints_to_full(q)
+        fk = self._ikpy_chain.forward_kinematics(q_full)
+        return [float(fk[0, 3]), float(fk[1, 3]), float(fk[2, 3])]
+
     def _joints_to_full(self, joint_angles: List[float]) -> np.ndarray:
         """Convert active-only joint angles to full ikpy array (including inactive links)."""
         full = np.zeros(len(self._active_mask))
