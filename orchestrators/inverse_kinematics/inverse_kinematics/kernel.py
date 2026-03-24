@@ -268,9 +268,7 @@ class InverseKinematicsKernel(PolyflowKernel):
           body_transforms: list of 4x4 transforms (len = num_joints + 1)
           pivot_frames:    list of 4x4 transforms (len = num_joints)
         """
-        # Start from the base component's visual rotation so the FK chain
-        # operates in scene-world coordinates.
-        body_transforms = [self._base_transform.copy()]
+        body_transforms = [np.eye(4)]
         pivot_frames = []
 
         for i, joint in enumerate(self._chain):
