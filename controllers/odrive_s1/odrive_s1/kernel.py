@@ -54,6 +54,23 @@ class ODriveS1Kernel(PolyflowKernel):
         self._last_commanded_position: Dict[str, float] = {}
         self._last_commanded_velocity: Dict[str, float] = {}
 
+        # Encoder state (set by mockSensorInputs in the logic worker)
+        self._position_rad: float = 0.0
+        self._velocity_rad_s: float = 0.0
+        self._effort: float = 0.0
+        self._connected: bool = False
+
+    def poll(self):
+        """Emit current encoder state as feedback."""
+        if not self._connected:
+            return
+        self.emit("state", {
+            "name": [self.joint_id],
+            "position": [self._position_rad],
+            "velocity": [self._velocity_rad_s],
+            "effort": [self._effort],
+        })
+
     @staticmethod
     def _clamp(value: float, min_v: Optional[float], max_v: Optional[float]) -> float:
         if min_v is not None:
