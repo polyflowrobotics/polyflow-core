@@ -86,6 +86,7 @@ class InverseKinematicsKernel(PolyflowKernel):
         self.max_iterations = int(self.get_param("max_iterations", 100))
         self.tolerance = float(self.get_param("tolerance", 0.001))
         self.damping = float(self.get_param("damping", 0.01))
+        self._regularization = float(self.get_param("regularization", 0.5))
 
         self._chain = self._build_chain()
         self._num_joints = len(self._chain)
@@ -270,11 +271,20 @@ class InverseKinematicsKernel(PolyflowKernel):
         return J
 
     def _solve_ik(self, target_pos: np.ndarray, current: List[float]) -> List[float]:
-        """DLS (damped least-squares) IK solver — position only."""
+        """DLS (damped least-squares) IK solver with joint-space regularization.
+
+        Minimizes: ||p_target - FK(q)||^2 + lambda_reg * ||q - q_ref||^2
+        This biases the solver toward small joint movements, avoiding wild
+        configurations (e.g. wrist flips by ±π) when multiple solutions exist.
+        """
         q = np.array(current, dtype=float)
+        q_ref = np.array(current, dtype=float)
         lam2 = self.damping ** 2
+        lam_reg = self._regularization
         prev_err = float("inf")
         stall_count = 0
+        lower = np.array([j["lower"] for j in self._chain])
+        upper = np.array([j["upper"] for j in self._chain])
 
         for iteration in range(self.max_iterations):
             transforms = self._forward_kinematics(q)
@@ -284,14 +294,14 @@ class InverseKinematicsKernel(PolyflowKernel):
 
             if err_norm < self.tolerance:
                 self.log(f"IK converged in {iteration + 1} iters (err={err_norm:.6f})")
-                return np.clip(q, [j["lower"] for j in self._chain], [j["upper"] for j in self._chain]).tolist()
+                return np.clip(q, lower, upper).tolist()
 
             # Stall detection
             if abs(prev_err - err_norm) < 1e-8:
                 stall_count += 1
                 if stall_count >= 5:
                     q += np.random.uniform(-0.1, 0.1, size=q.shape)
-                    q = np.clip(q, [j["lower"] for j in self._chain], [j["upper"] for j in self._chain])
+                    q = np.clip(q, lower, upper)
                     stall_count = 0
             else:
                 stall_count = 0
@@ -299,11 +309,13 @@ class InverseKinematicsKernel(PolyflowKernel):
 
             # Position-only: use 3xN Jacobian
             J = self._compute_jacobian(q)[:3, :]
-            JJT = J @ J.T + lam2 * np.eye(3)
-            dq = J.T @ np.linalg.solve(JJT, error_3)
+            # DLS with regularization: dq = (J^T J + λ²I + λ_reg I)^-1 (J^T e - λ_reg (q - q_ref))
+            JTJ = J.T @ J + (lam2 + lam_reg) * np.eye(self._num_joints)
+            rhs = J.T @ error_3 - lam_reg * (q - q_ref)
+            dq = np.linalg.solve(JTJ, rhs)
 
             q += dq
-            q = np.clip(q, [j["lower"] for j in self._chain], [j["upper"] for j in self._chain])
+            q = np.clip(q, lower, upper)
 
         self.log(f"IK did not converge after {self.max_iterations} iters (err={err_norm:.6f})")
         return q.tolist()
