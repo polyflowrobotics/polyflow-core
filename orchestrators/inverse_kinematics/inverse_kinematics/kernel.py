@@ -75,6 +75,16 @@ class InverseKinematicsKernel(PolyflowKernel):
         self.tolerance = float(self.get_param("tolerance", 0.001))
         self.damping = float(self.get_param("damping", 0.01))
 
+        # Base component's visual-origin rotation (degrees) — used to build the
+        # FK chain in scene-world coordinates so targets can be passed directly.
+        base_rot = self.get_param("base_visual_rotation_deg", {})
+        rx = math.radians(base_rot.get("rx", 0))
+        ry = math.radians(base_rot.get("ry", 0))
+        rz = math.radians(base_rot.get("rz", 0))
+        self._base_rotation = _euler_to_rotation(rx, ry, rz)
+        self._base_transform = _homogeneous(self._base_rotation, np.zeros(3))
+        self.log(f"Base visual rotation (deg): rx={base_rot.get('rx', 0)}, ry={base_rot.get('ry', 0)}, rz={base_rot.get('rz', 0)}")
+
         self._chain = self._build_chain(self.root_component_id, self.end_effector_component_id, self.components, self.joints)
         self._num_joints = len(self._chain)
         self._current_joint_positions: Optional[List[float]] = None
@@ -258,7 +268,9 @@ class InverseKinematicsKernel(PolyflowKernel):
           body_transforms: list of 4x4 transforms (len = num_joints + 1)
           pivot_frames:    list of 4x4 transforms (len = num_joints)
         """
-        body_transforms = [np.eye(4)]
+        # Start from the base component's visual rotation so the FK chain
+        # operates in scene-world coordinates.
+        body_transforms = [self._base_transform.copy()]
         pivot_frames = []
 
         for i, joint in enumerate(self._chain):
