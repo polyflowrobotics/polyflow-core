@@ -102,6 +102,14 @@ class InverseKinematicsKernel(PolyflowKernel):
         for i, j in enumerate(self._chain):
             self.log(f"  [{i}] {j['name']} type={j['type']} axis={j['axis'].tolist()}")
 
+        # Dump FK body positions at q=0 for comparison with PhysX
+        q0 = np.zeros(self._num_joints)
+        fk0 = self._forward_kinematics(q0)
+        self.log(f"FK at q=0 body positions:")
+        for i, T in enumerate(fk0):
+            p = T[:3, 3]
+            self.log(f"  body[{i}] pos=({p[0]:.6f}, {p[1]:.6f}, {p[2]:.6f})")
+
     def _build_chain(self) -> List[Dict[str, Any]]:
         """Build kinematic chain via BFS from root to end-effector."""
         comp_by_id = {c.get("_id", c.get("component_id", "")): c for c in self.components}
