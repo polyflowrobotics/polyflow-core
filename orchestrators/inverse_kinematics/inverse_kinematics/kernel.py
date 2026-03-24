@@ -67,7 +67,7 @@ class InverseKinematicsKernel(PolyflowKernel):
         self.joints: List[Dict[str, Any]] = self.get_param("joints", [])
         self.max_iterations = int(self.get_param("max_iterations", 100))
         self.tolerance = float(self.get_param("tolerance", 0.001))
-        self._regularization = float(self.get_param("regularization", 0.1))
+        self._regularization = float(self.get_param("regularization", 0.001))
 
         self._chain = self._build_chain()
         self._num_joints = len(self._chain)
