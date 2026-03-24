@@ -118,8 +118,9 @@
     },
 
     "can.poll_hz": {
-      "label": "CAN Poll Rate (Hz)",
+      "label": "CAN Poll Rate",
       "type": "number",
+      "units": "Hz",
       "default": 50,
       "description": "Rate to request encoder estimates from ODrive.",
       "ui": { "group": "CAN", "order": 5 }
@@ -134,8 +135,9 @@
     },
 
     "can.heartbeat_timeout_s": {
-      "label": "CAN Heartbeat Timeout (s)",
+      "label": "CAN Heartbeat Timeout",
       "type": "number",
+      "units": "s",
       "default": 2.0,
       "description": "Warn if heartbeat isn't seen within this period after startup.",
       "ui": { "group": "CAN", "order": 7 }
@@ -150,8 +152,9 @@
     },
 
     "can.torque_constant": {
-      "label": "Torque Constant (Nm/A)",
+      "label": "Torque Constant",
       "type": "number",
+      "units": "Nm/A",
       "default": 0,
       "description": "If set and can.request_iq is enabled, effort is estimated as torque_constant * Iq_measured.",
       "ui": { "group": "CAN", "order": 9 }
@@ -160,6 +163,7 @@
     "limit.lower_position": {
       "label": "Min. Rotation",
       "type": "number",
+      "units": "deg",
       "source": "entity_property",
       "binding": {
         "from_param": "joint_id",
@@ -172,6 +176,7 @@
     "limit.upper_position": {
       "label": "Max. Rotation",
       "type": "number",
+      "units": "deg",
       "source": "entity_property",
       "binding": {
         "from_param": "joint_id",
@@ -184,6 +189,7 @@
     "limit.position_step": {
       "label": "Rotation Step",
       "type": "number",
+      "units": "deg",
       "source": "entity_property",
       "binding": {
         "from_param": "joint_id",
@@ -196,6 +202,7 @@
     "limit.max_effort": {
       "label": "Max Effort",
       "type": "number",
+      "units": "Nm",
       "source": "entity_property",
       "binding": {
         "from_param": "joint_id",
@@ -208,6 +215,7 @@
     "limit.effort_step": {
       "label": "Effort Step",
       "type": "number",
+      "units": "Nm",
       "source": "entity_property",
       "binding": {
         "from_param": "joint_id",
@@ -220,6 +228,7 @@
     "limit.max_velocity": {
       "label": "Max Velocity",
       "type": "number",
+      "units": "rad/s",
       "source": "entity_property",
       "binding": {
         "from_param": "joint_id",
@@ -232,6 +241,7 @@
     "limit.velocity_step": {
       "label": "Velocity Step",
       "type": "number",
+      "units": "rad/s",
       "source": "entity_property",
       "binding": {
         "from_param": "joint_id",

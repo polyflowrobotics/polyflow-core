@@ -30,8 +30,9 @@
       "ui": { "group": "Gamepad", "order": 1 }
     },
     "poll_rate_hz": {
-      "label": "Poll Rate (Hz)",
+      "label": "Poll Rate",
       "type": "number",
+      "units": "Hz",
       "default": 60,
       "description": "How often to poll the gamepad.",
       "ui": { "group": "Gamepad", "order": 2 }
@@ -44,15 +45,17 @@
       "ui": { "group": "Gamepad", "order": 3 }
     },
     "max_linear_speed": {
-      "label": "Max Linear Speed (m/s)",
+      "label": "Max Linear Speed",
       "type": "number",
+      "units": "m/s",
       "default": 1.0,
       "description": "Maximum forward/backward speed for cmd_vel output.",
       "ui": { "group": "Velocity", "order": 1 }
     },
     "max_angular_speed": {
-      "label": "Max Angular Speed (rad/s)",
+      "label": "Max Angular Speed",
       "type": "number",
+      "units": "rad/s",
       "default": 2.0,
       "description": "Maximum turning rate for cmd_vel output.",
       "ui": { "group": "Velocity", "order": 2 }

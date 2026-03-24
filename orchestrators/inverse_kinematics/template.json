@@ -70,8 +70,9 @@
       "ui": { "group": "Solver", "order": 1 }
     },
     "tolerance": {
-      "label": "Position Tolerance (m)",
+      "label": "Position Tolerance",
       "type": "number",
+      "units": "m",
       "default": 0.001,
       "description": "Target position tolerance in meters.",
       "ui": { "group": "Solver", "order": 2 }

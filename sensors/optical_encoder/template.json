@@ -32,8 +32,9 @@
       "ui": { "group": "Encoder", "order": 2 }
     },
     "publish_rate_hz": {
-      "label": "Publish Rate (Hz)",
+      "label": "Publish Rate",
       "type": "number",
+      "units": "Hz",
       "default": 50,
       "description": "How often to publish encoder state.",
       "ui": { "group": "Encoder", "order": 3 }

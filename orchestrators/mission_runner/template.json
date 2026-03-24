@@ -25,15 +25,17 @@
       "ui": { "group": "Mission", "order": 0 }
     },
     "linear_speed": {
-      "label": "Linear Speed (m/s)",
+      "label": "Linear Speed",
       "type": "number",
+      "units": "m/s",
       "default": 0.5,
       "description": "Speed in m/s for forward and backward commands.",
       "ui": { "group": "Speeds", "order": 1 }
     },
     "angular_speed": {
-      "label": "Angular Speed (rad/s)",
+      "label": "Angular Speed",
       "type": "number",
+      "units": "rad/s",
       "default": 1.0,
       "description": "Rotation speed in rad/s for turn commands.",
       "ui": { "group": "Speeds", "order": 2 }

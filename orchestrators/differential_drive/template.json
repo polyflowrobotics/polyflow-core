@@ -38,22 +38,25 @@
   "actions": [],
   "parameters_schema": {
     "wheel_radius": {
-      "label": "Wheel Radius (m)",
+      "label": "Wheel Radius",
       "type": "number",
+      "units": "m",
       "default": 0.05,
       "description": "Wheel radius in meters.",
       "ui": { "group": "Kinematics", "order": 1 }
     },
     "wheel_separation": {
-      "label": "Wheel Separation (m)",
+      "label": "Wheel Separation",
       "type": "number",
+      "units": "m",
       "default": 0.3,
       "description": "Distance between left and right wheels in meters.",
       "ui": { "group": "Kinematics", "order": 2 }
     },
     "max_wheel_speed": {
-      "label": "Max Wheel Speed (m/s)",
+      "label": "Max Wheel Speed",
       "type": "number",
+      "units": "m/s",
       "default": 1.0,
       "description": "Maximum wheel speed in m/s.",
       "ui": { "group": "Kinematics", "order": 3 }

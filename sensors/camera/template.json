@@ -32,14 +32,16 @@
       "ui": { "group": "Camera", "order": 2 }
     },
     "width": {
-      "label": "Width (px)",
+      "label": "Width",
       "type": "number",
+      "units": "px",
       "default": 640,
       "ui": { "group": "Resolution", "order": 1 }
     },
     "height": {
-      "label": "Height (px)",
+      "label": "Height",
       "type": "number",
+      "units": "px",
       "default": 480,
       "ui": { "group": "Resolution", "order": 2 }
     },
