@@ -378,6 +378,8 @@ class InverseKinematicsKernel(PolyflowKernel):
         Solve IK via damped least-squares (Levenberg-Marquardt) pseudoinverse.
 
         Uses J^T (J J^T + λ²I)^{-1} to avoid singularity issues.
+        If the solver stalls (near a singularity), it perturbs joint angles
+        to escape the singular configuration.
         """
         q = np.array(current, dtype=float)
 
@@ -394,6 +396,8 @@ class InverseKinematicsKernel(PolyflowKernel):
                 target_quat = np.array([x, y, z, w])
 
         lam2 = self.damping ** 2
+        prev_err = float("inf")
+        stall_count = 0
 
         for iteration in range(self.max_iterations):
             transforms = self._forward_kinematics(q)
@@ -404,6 +408,18 @@ class InverseKinematicsKernel(PolyflowKernel):
                 if target_quat is None or np.linalg.norm(error[3:]) < self.tolerance:
                     self.log(f"IK converged in {iteration + 1} iterations (err={pos_err_norm:.6f})")
                     return self._clamp_joints(q).tolist()
+
+            # Detect stall (singularity): if error barely changes, perturb joints
+            if abs(prev_err - pos_err_norm) < 1e-8:
+                stall_count += 1
+                if stall_count >= 5:
+                    q += np.random.uniform(-0.1, 0.1, size=q.shape)
+                    q = self._clamp_joints(q)
+                    stall_count = 0
+                    self.log(f"IK stalled at iteration {iteration}, perturbing joints")
+            else:
+                stall_count = 0
+            prev_err = pos_err_norm
 
             J = self._compute_jacobian(q)
             JJT = J @ J.T + lam2 * np.eye(6)
