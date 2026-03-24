@@ -352,6 +352,9 @@ class InverseKinematicsKernel(PolyflowKernel):
             self.log(f"Solution: {[f'{a:.4f}' for a in solution]}")
             self.log(f"FK at solution (m): [{sol_ee[0]:.4f}, {sol_ee[1]:.4f}, {sol_ee[2]:.4f}]")
 
+            # Update current positions so the next solve starts from this solution
+            self._current_joint_positions = list(solution)
+
             joint_ids = [joint["_id"] for joint in self._chain]
             self.emit("joint_commands", {
                 "name": joint_ids,
