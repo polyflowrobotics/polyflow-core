@@ -492,8 +492,13 @@ class InverseKinematicsKernel(PolyflowKernel):
                 self.log(f"  [{i}] {j['name']} type={j['type']} axis={list(j['axis'])} output_t={[f'{v:.4f}' for v in j['origin_translation']]} output_r={[f'{v:.4f}' for v in j['origin_rotation']]} input_t={[f'{v:.4f}' for v in j['child_input_translation']]} input_r={[f'{v:.4f}' for v in j['child_input_rotation']]}")
 
             solution = self._solve_ik(data, self._current_joint_positions)
-            self.log(f"IK solution: {solution}")
             if solution is not None:
+                # Verify: FK at solution angles
+                sol_transforms = self._forward_kinematics(np.array(solution))
+                sol_ee = sol_transforms[-1][:3, 3]
+                self.log(f"IK solution: {[f'{a:.4f}' for a in solution]}")
+                self.log(f"FK at solution (m): [{sol_ee[0]:.4f}, {sol_ee[1]:.4f}, {sol_ee[2]:.4f}]")
+                self.log(f"Target was (m): [{target_pos[0]:.4f}, {target_pos[1]:.4f}, {target_pos[2]:.4f}]")
                 joint_ids = [joint["_id"] for joint in self._chain]
                 self.emit("joint_commands", {
                     "name": joint_ids,
