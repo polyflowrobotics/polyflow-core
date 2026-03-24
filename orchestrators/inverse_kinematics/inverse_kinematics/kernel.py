@@ -173,7 +173,7 @@ class InverseKinematicsKernel(PolyflowKernel):
             lower_raw = limit.get("lower_position", limit.get("lower", None))
             upper_raw = limit.get("upper_position", limit.get("upper", None))
             if joint_type == "continuous" or (lower_raw is None and upper_raw is None):
-                lower, upper = -math.pi, math.pi
+                lower, upper = -math.inf, math.inf
             else:
                 lower = math.radians(lower_raw) if lower_raw is not None else -math.pi
                 upper = math.radians(upper_raw) if upper_raw is not None else math.pi
@@ -245,6 +245,9 @@ class InverseKinematicsKernel(PolyflowKernel):
         q_ref = np.array(current, dtype=float)
         lower = np.array([j["lower"] for j in self._chain])
         upper = np.array([j["upper"] for j in self._chain])
+        # Clamp x0 to bounds — floating point drift can push joint positions
+        # slightly past limits (e.g. 3.1416 > pi), making x0 infeasible
+        q_ref = np.clip(q_ref, lower, upper)
         lam_reg = self._regularization
 
         def residuals(q):
