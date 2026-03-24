@@ -33,6 +33,30 @@ def _homogeneous(rotation: np.ndarray, translation: np.ndarray) -> np.ndarray:
     return T
 
 
+def _align_x_to(direction: np.ndarray) -> np.ndarray:
+    """Rotation matrix that maps the X axis [1,0,0] to the given unit direction.
+
+    Mirrors the physics worker's quatAlignXTo() — used so that PhysX eTWIST
+    (rotation around the joint frame's X axis) maps to the desired joint axis.
+    """
+    d = direction / np.linalg.norm(direction)
+    from_vec = np.array([1.0, 0.0, 0.0])
+    dot = float(np.dot(from_vec, d))
+    if dot > 0.999999:
+        return np.eye(3)
+    if dot < -0.999999:
+        # 180° around Z
+        return np.diag([-1.0, -1.0, 1.0])
+    cross = np.cross(from_vec, d)
+    K = np.array([
+        [0, -cross[2], cross[1]],
+        [cross[2], 0, -cross[0]],
+        [-cross[1], cross[0], 0],
+    ])
+    # Rodrigues: R = I + K + K²/(1+dot)
+    return np.eye(3) + K + (K @ K) / (1 + dot)
+
+
 class InverseKinematicsKernel(PolyflowKernel):
     """
     Portable inverse kinematics solver using Jacobian pseudoinverse.
@@ -261,8 +285,11 @@ class InverseKinematicsKernel(PolyflowKernel):
         """
         Compute both body-frame and joint-pivot-frame transforms in a single pass.
 
-        For each joint the chain is:
-          parent body → T_output → T_joint → (pivot frame) → T_input_inv → child body
+        Mirrors PhysX articulation FK exactly:
+          parentPose  = T(anchor1, R_output * alignXTo(axis))
+          childPose   = T(anchor2, R_input  * alignXTo(axis))
+          joint_rot   = rotation around X by q[i]  (eTWIST)
+          child_body  = parent_body @ parentPose @ joint_rot @ inv(childPose)
 
         Returns:
           body_transforms: list of 4x4 transforms (len = num_joints + 1)
@@ -272,30 +299,36 @@ class InverseKinematicsKernel(PolyflowKernel):
         pivot_frames = []
 
         for i, joint in enumerate(self._chain):
-            # Output origin: parent body → joint pivot
-            R_output = _euler_to_rotation(*joint["origin_rotation"])
-            T_output = _homogeneous(R_output, joint["origin_translation"])
+            axis = joint["axis"]
+            R_align = _align_x_to(axis)
 
-            # Joint actuation
+            # Parent pose: output origin rotation composed with axis alignment
+            R_output = _euler_to_rotation(*joint["origin_rotation"])
+            R_parent_frame = R_output @ R_align
+            T_parent_pose = _homogeneous(R_parent_frame, joint["origin_translation"])
+
+            # Child pose: input origin rotation composed with axis alignment
+            R_input = _euler_to_rotation(*joint["child_input_rotation"])
+            R_child_frame = R_input @ R_align
+            T_child_pose = _homogeneous(R_child_frame, joint["child_input_translation"])
+            T_child_pose_inv = np.linalg.inv(T_child_pose)
+
+            # Joint actuation: rotation around X axis (PhysX eTWIST convention)
             if joint["type"] in ("revolute", "continuous"):
-                R_joint = _rotation_matrix(joint["axis"], q[i])
+                R_joint = _rotation_matrix(np.array([1.0, 0.0, 0.0]), q[i])
                 T_joint = _homogeneous(R_joint, np.zeros(3))
             elif joint["type"] == "prismatic":
-                T_joint = _homogeneous(np.eye(3), joint["axis"] * q[i])
+                T_joint = _homogeneous(np.eye(3), np.array([1.0, 0.0, 0.0]) * q[i])
             else:
                 T_joint = np.eye(4)
 
-            T_pivot = body_transforms[-1] @ T_output @ T_joint
-            pivot_frames.append(T_pivot)
+            # Joint frame in world (before joint rotation) — used for Jacobian
+            T_joint_frame = body_transforms[-1] @ T_parent_pose
+            pivot_frames.append(T_joint_frame)
 
-            # Child input origin: the child body frame is offset from the
-            # joint pivot by the input connector's origin (mirroring PhysX
-            # setChildPose(anchor2, childFrameRot)).  Apply the inverse of
-            # the child input transform so the child body sits correctly.
-            R_input = _euler_to_rotation(*joint["child_input_rotation"])
-            T_input = _homogeneous(R_input, joint["child_input_translation"])
-            T_input_inv = np.linalg.inv(T_input)
-            body_transforms.append(T_pivot @ T_input_inv)
+            # Child body = parent_body @ parentPose @ joint_rot @ inv(childPose)
+            T_child = T_joint_frame @ T_joint @ T_child_pose_inv
+            body_transforms.append(T_child)
 
         return body_transforms, pivot_frames
 
@@ -306,18 +339,19 @@ class InverseKinematicsKernel(PolyflowKernel):
         For revolute joints:  J_i = [z_i × (p_ee - p_i); z_i]
         For prismatic joints: J_i = [z_i; 0]
 
-        Uses the joint pivot frames (before child input offset) for positions/axes.
+        The joint frame's X axis is the rotation/translation axis (PhysX eTWIST).
         """
         body_transforms, pivot_frames = self._fk_full(q)
         p_ee = body_transforms[-1][:3, 3]
 
         J = np.zeros((6, self._num_joints))
         for i, joint in enumerate(self._chain):
-            T_pivot = pivot_frames[i]
-            z_i = T_pivot[:3, :3] @ joint["axis"]
+            T_frame = pivot_frames[i]
+            # Joint axis in world = X column of joint frame rotation
+            z_i = T_frame[:3, 0]
 
             if joint["type"] in ("revolute", "continuous"):
-                p_i = T_pivot[:3, 3]
+                p_i = T_frame[:3, 3]
                 J[:3, i] = np.cross(z_i, p_ee - p_i)
                 J[3:, i] = z_i
             elif joint["type"] == "prismatic":
