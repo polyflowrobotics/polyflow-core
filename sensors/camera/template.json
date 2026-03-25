@@ -36,6 +36,7 @@
       "type": "number",
       "units": "px",
       "default": 640,
+      "description": "Capture width in pixels.",
       "ui": { "group": "Resolution", "order": 1 }
     },
     "height": {
@@ -43,6 +44,7 @@
       "type": "number",
       "units": "px",
       "default": 480,
+      "description": "Capture height in pixels.",
       "ui": { "group": "Resolution", "order": 2 }
     },
     "fps": {
