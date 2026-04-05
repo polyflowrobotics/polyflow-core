@@ -41,13 +41,13 @@ class ODriveS1Kernel(PolyflowKernel):
         self.state_position_scale = float(self.get_param("state_position_scale", default_state_pos_scale))
         self.state_velocity_scale = float(self.get_param("state_velocity_scale", default_state_vel_scale))
 
-        self.lower_position = self.get_param(["limit.lower_position", "lower_position"])
-        self.upper_position = self.get_param(["limit.upper_position", "upper_position"])
-        self.position_step = self.get_param(["limit.position_step", "position_step"])
-        self.max_effort = self.get_param(["limit.max_effort", "max_effort"])
-        self.effort_step = self.get_param(["limit.effort_step", "effort_step"])
-        self.max_velocity = self.get_param(["limit.max_velocity", "max_velocity"])
-        self.velocity_step = self.get_param(["limit.velocity_step", "velocity_step"])
+        self.lower_position = self.get_param("min_angle")
+        self.upper_position = self.get_param("max_angle")
+        self.position_step = self.get_param("position_step")
+        self.max_effort = self.get_param("max_effort")
+        self.effort_step = self.get_param("effort_step")
+        self.max_velocity = self.get_param("max_velocity")
+        self.velocity_step = self.get_param("velocity_step")
 
         # Smoothing parameters
         self.smoothing_alpha = float(self.get_param("smoothing_alpha", 0.0))

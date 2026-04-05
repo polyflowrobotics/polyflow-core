@@ -40,12 +40,9 @@
       "required": true,
       "description": "Joint ID this controller manages",
       "entity_source": {
-        "selector": "components.outputs",
-        "filters": {
-          "output_type": "joint",
-          "joint_type": "revolute,continuous"
-        },
-        "value_field": "_id",
+        "selector": "components.io",
+        "filters": { "io_type": "joint" },
+        "value_field": "joint_id",
         "label_field": "name"
       },
       "ui": { "group": "Joint", "order": 1 }
@@ -160,94 +157,94 @@
       "ui": { "group": "CAN", "order": 9 }
     },
 
-    "limit.lower_position": {
+    "min_angle": {
       "label": "Min. Rotation",
       "type": "number",
       "units": "deg",
       "source": "entity_property",
-      "binding": {
-        "from_param": "joint_id",
-        "field_path": "limit.lower_position"
-      },
       "editable": false,
+      "binding": {
+        "from_param": "joint_io",
+        "field_path": "specs.min_position.value"
+      },
       "ui": { "group": "Limits", "order": 1 }
     },
 
-    "limit.upper_position": {
+    "max_angle": {
       "label": "Max. Rotation",
       "type": "number",
       "units": "deg",
       "source": "entity_property",
-      "binding": {
-        "from_param": "joint_id",
-        "field_path": "limit.upper_position"
-      },
       "editable": false,
+      "binding": {
+        "from_param": "joint_io",
+        "field_path": "specs.max_position.value"
+      },
       "ui": { "group": "Limits", "order": 2 }
     },
 
-    "limit.position_step": {
+    "position_step": {
       "label": "Rotation Step",
       "type": "number",
       "units": "deg",
       "source": "entity_property",
-      "binding": {
-        "from_param": "joint_id",
-        "field_path": "limit.position_step"
-      },
       "editable": false,
+      "binding": {
+        "from_param": "joint_io",
+        "field_path": "specs.position_step.value"
+      },
       "ui": { "group": "Limits", "order": 3 }
     },
 
-    "limit.max_effort": {
+    "max_effort": {
       "label": "Max Effort",
       "type": "number",
       "units": "Nm",
       "source": "entity_property",
-      "binding": {
-        "from_param": "joint_id",
-        "field_path": "limit.max_effort"
-      },
       "editable": false,
+      "binding": {
+        "from_param": "joint_io",
+        "field_path": "specs.max_effort.value"
+      },
       "ui": { "group": "Limits", "order": 4 }
     },
 
-    "limit.effort_step": {
+    "effort_step": {
       "label": "Effort Step",
       "type": "number",
       "units": "Nm",
       "source": "entity_property",
-      "binding": {
-        "from_param": "joint_id",
-        "field_path": "limit.effort_step"
-      },
       "editable": false,
+      "binding": {
+        "from_param": "joint_io",
+        "field_path": "specs.effort_step.value"
+      },
       "ui": { "group": "Limits", "order": 5 }
     },
 
-    "limit.max_velocity": {
+    "max_velocity": {
       "label": "Max Velocity",
       "type": "number",
       "units": "rad/s",
       "source": "entity_property",
-      "binding": {
-        "from_param": "joint_id",
-        "field_path": "limit.max_velocity"
-      },
       "editable": false,
+      "binding": {
+        "from_param": "joint_io",
+        "field_path": "specs.max_velocity.value"
+      },
       "ui": { "group": "Limits", "order": 6 }
     },
 
-    "limit.velocity_step": {
+    "velocity_step": {
       "label": "Velocity Step",
       "type": "number",
       "units": "rad/s",
       "source": "entity_property",
-      "binding": {
-        "from_param": "joint_id",
-        "field_path": "limit.velocity_step"
-      },
       "editable": false,
+      "binding": {
+        "from_param": "joint_io",
+        "field_path": "specs.velocity_step.value"
+      },
       "ui": { "group": "Limits", "order": 7 }
     }
   },
