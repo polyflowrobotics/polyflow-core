@@ -165,7 +165,7 @@
       "editable": false,
       "binding": {
         "from_param": "joint_id",
-        "field_path": "specs.min_position.value"
+        "field_path": "specs.lower_position.value"
       },
       "ui": { "group": "Limits", "order": 1 }
     },
@@ -178,7 +178,7 @@
       "editable": false,
       "binding": {
         "from_param": "joint_id",
-        "field_path": "specs.max_position.value"
+        "field_path": "specs.upper_position.value"
       },
       "ui": { "group": "Limits", "order": 2 }
     },
