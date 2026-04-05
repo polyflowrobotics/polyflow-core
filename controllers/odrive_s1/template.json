@@ -42,7 +42,7 @@
       "entity_source": {
         "selector": "components.io",
         "filters": { "io_type": "joint" },
-        "value_field": "joint_id",
+        "value_field": "_id",
         "label_field": "name"
       },
       "ui": { "group": "Joint", "order": 1 }
@@ -164,7 +164,7 @@
       "source": "entity_property",
       "editable": false,
       "binding": {
-        "from_param": "joint_io",
+        "from_param": "joint_id",
         "field_path": "specs.min_position.value"
       },
       "ui": { "group": "Limits", "order": 1 }
@@ -177,7 +177,7 @@
       "source": "entity_property",
       "editable": false,
       "binding": {
-        "from_param": "joint_io",
+        "from_param": "joint_id",
         "field_path": "specs.max_position.value"
       },
       "ui": { "group": "Limits", "order": 2 }
@@ -190,7 +190,7 @@
       "source": "entity_property",
       "editable": false,
       "binding": {
-        "from_param": "joint_io",
+        "from_param": "joint_id",
         "field_path": "specs.position_step.value"
       },
       "ui": { "group": "Limits", "order": 3 }
@@ -203,7 +203,7 @@
       "source": "entity_property",
       "editable": false,
       "binding": {
-        "from_param": "joint_io",
+        "from_param": "joint_id",
         "field_path": "specs.max_effort.value"
       },
       "ui": { "group": "Limits", "order": 4 }
@@ -216,7 +216,7 @@
       "source": "entity_property",
       "editable": false,
       "binding": {
-        "from_param": "joint_io",
+        "from_param": "joint_id",
         "field_path": "specs.effort_step.value"
       },
       "ui": { "group": "Limits", "order": 5 }
@@ -229,7 +229,7 @@
       "source": "entity_property",
       "editable": false,
       "binding": {
-        "from_param": "joint_io",
+        "from_param": "joint_id",
         "field_path": "specs.max_velocity.value"
       },
       "ui": { "group": "Limits", "order": 6 }
@@ -242,7 +242,7 @@
       "source": "entity_property",
       "editable": false,
       "binding": {
-        "from_param": "joint_io",
+        "from_param": "joint_id",
         "field_path": "specs.velocity_step.value"
       },
       "ui": { "group": "Limits", "order": 7 }
