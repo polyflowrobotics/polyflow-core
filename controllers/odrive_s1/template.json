@@ -41,7 +41,7 @@
       "description": "Joint ID this controller manages",
       "entity_source": {
         "selector": "components.io",
-        "filters": { "type": "joint" },
+        "filters": { "direction": "output", "type": "joint", "specs.joint_type.value": "revolute,continuous" },
         "value_field": "_id",
         "label_field": "name"
       },
