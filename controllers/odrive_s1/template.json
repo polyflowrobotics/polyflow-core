@@ -41,7 +41,7 @@
       "description": "Joint ID this controller manages",
       "entity_source": {
         "selector": "components.io",
-        "filters": { "io_type": "joint" },
+        "filters": { "type": "joint" },
         "value_field": "_id",
         "label_field": "name"
       },
