@@ -138,7 +138,9 @@ class InverseKinematicsKernel(PolyflowKernel):
             output_t = np.array([origin.get("x", 0), origin.get("y", 0), origin.get("z", 0)], dtype=float)
             output_r = _euler_to_rotation(origin.get("rx", 0), origin.get("ry", 0), origin.get("rz", 0))
 
-            # Child input origin — look up from component data (in mm → meters)
+            # Child input origin — look up from component data (in mm → meters).
+            # Post-refactor components use a unified `io` array with direction markers
+            # instead of separate `inputs`/`outputs`.
             child_id = joint.get("child", "")
             child_input_id = joint.get("child_input", "")
             child_comp = comp_by_id.get(child_id, {})
@@ -146,20 +148,25 @@ class InverseKinematicsKernel(PolyflowKernel):
             input_r = np.eye(3)
             input_axis = None
             if child_input_id:
-                for inp in child_comp.get("inputs", []):
-                    if inp.get("_id") == child_input_id:
-                        io = inp.get("origin", {})
-                        input_t = np.array([io.get("x", 0), io.get("y", 0), io.get("z", 0)], dtype=float) / 1000.0
-                        input_r = _euler_to_rotation(io.get("rx", 0), io.get("ry", 0), io.get("rz", 0))
-                        # Input connector axis (faces opposite to output axis)
-                        ia = inp.get("axis", None)
-                        if ia:
-                            input_axis = np.array([ia.get("x", 0), ia.get("y", 0), ia.get("z", 0)], dtype=float)
-                            if np.linalg.norm(input_axis) > 1e-9:
-                                input_axis = input_axis / np.linalg.norm(input_axis)
-                            else:
-                                input_axis = None
-                        break
+                io_entries = child_comp.get("io") or child_comp.get("inputs", [])
+                for inp in io_entries:
+                    if inp.get("_id") != child_input_id:
+                        continue
+                    direction = inp.get("direction")
+                    if direction and direction != "input":
+                        continue
+                    io = inp.get("origin", {})
+                    input_t = np.array([io.get("x", 0), io.get("y", 0), io.get("z", 0)], dtype=float) / 1000.0
+                    input_r = _euler_to_rotation(io.get("rx", 0), io.get("ry", 0), io.get("rz", 0))
+                    # Input connector axis (faces opposite to output axis)
+                    ia = inp.get("axis", None)
+                    if ia:
+                        input_axis = np.array([ia.get("x", 0), ia.get("y", 0), ia.get("z", 0)], dtype=float)
+                        if np.linalg.norm(input_axis) > 1e-9:
+                            input_axis = input_axis / np.linalg.norm(input_axis)
+                        else:
+                            input_axis = None
+                    break
 
             # Joint axis (output axis)
             axis_raw = joint.get("axis", {"x": 0, "y": 0, "z": 1})
