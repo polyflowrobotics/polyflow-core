@@ -1,0 +1,208 @@
+{
+  "schema_version": 1,
+  "name": "hiwonder_rrc",
+  "drivers": [
+    {
+      "name": "hiwonder_rrc_board",
+      "class": "hiwonder_rrc_adapter.board_adapter:HiwonderRRCBoardAdapter",
+      "iotype_compat": ["imu", "battery"],
+      "parameters": {
+        "device": {
+          "label": "Serial Device",
+          "description": "USB serial path for the RRC board.",
+          "type": "string",
+          "default": "/dev/ttyAMA0",
+          "scope": "instance"
+        },
+        "baud": {
+          "label": "Baud Rate",
+          "type": "number",
+          "default": 1000000,
+          "scope": "instance"
+        },
+        "poll_hz": {
+          "label": "Queue Poll Rate (Hz)",
+          "description": "Rate at which the adapter drains IMU/battery queues and republishes as PRP state.",
+          "type": "number",
+          "default": 100,
+          "min": 1,
+          "scope": "instance"
+        },
+        "battery_cells": {
+          "label": "Battery Cell Count",
+          "description": "Series cell count — used only to populate BatteryState.cell_voltage length.",
+          "type": "number",
+          "default": 3,
+          "scope": "instance"
+        }
+      }
+    },
+    {
+      "name": "hiwonder_rrc_motor",
+      "class": "hiwonder_rrc_adapter.motor_adapter:HiwonderRRCMotorAdapter",
+      "iotype_compat": ["motor"],
+      "host_hint": "hiwonder_rrc_board",
+      "parameters": {
+        "board": {
+          "label": "RRC Board ID",
+          "description": "target_id of the hiwonder_rrc_board entry that owns the serial port.",
+          "type": "string",
+          "required": true,
+          "scope": "instance"
+        },
+        "port": {
+          "label": "Motor Port",
+          "description": "RRC motor channel (1–4).",
+          "type": "number",
+          "min": 1,
+          "max": 4,
+          "required": true,
+          "scope": "instance"
+        },
+        "gear_ratio": {
+          "label": "Gear Ratio",
+          "description": "Motor-shaft to output-shaft reduction (N:1). SPEED commands are in output rad/s.",
+          "type": "number",
+          "default": 1.0,
+          "min": 0.0001,
+          "scope": "part"
+        },
+        "invert": {
+          "label": "Invert Direction",
+          "type": "boolean",
+          "default": false,
+          "scope": "instance"
+        },
+        "state_hz": {
+          "label": "State Publish Rate (Hz)",
+          "description": "MotorState publish rate. RRC firmware does not report encoder ticks; measured_value echoes the commanded value.",
+          "type": "number",
+          "default": 10,
+          "min": 0,
+          "scope": "instance"
+        }
+      }
+    },
+    {
+      "name": "hiwonder_rrc_pwm_servo",
+      "class": "hiwonder_rrc_adapter.pwm_servo_adapter.HiwonderRRCPWMServoAdapter",
+      "iotype_compat": ["servo"],
+      "host_hint": "hiwonder_rrc_board",
+      "parameters": {
+        "board": {
+          "label": "RRC Board ID",
+          "type": "string",
+          "required": true,
+          "scope": "instance"
+        },
+        "channel": {
+          "label": "PWM Channel",
+          "description": "RRC PWM servo channel (1–4).",
+          "type": "number",
+          "min": 1,
+          "max": 4,
+          "required": true,
+          "scope": "instance"
+        },
+        "pulse_min_us": {
+          "label": "Pulse Min (µs)",
+          "type": "number",
+          "default": 500,
+          "scope": "part"
+        },
+        "pulse_max_us": {
+          "label": "Pulse Max (µs)",
+          "type": "number",
+          "default": 2500,
+          "scope": "part"
+        },
+        "angle_min_rad": {
+          "label": "Angle Min (rad)",
+          "type": "number",
+          "default": -1.5708,
+          "scope": "part"
+        },
+        "angle_max_rad": {
+          "label": "Angle Max (rad)",
+          "type": "number",
+          "default": 1.5708,
+          "scope": "part"
+        },
+        "default_duration_ms": {
+          "label": "Default Duration (ms)",
+          "description": "Used when a ServoCommand has duration == 0.",
+          "type": "number",
+          "default": 20,
+          "scope": "instance"
+        },
+        "state_hz": {
+          "label": "State Publish Rate (Hz)",
+          "type": "number",
+          "default": 10,
+          "min": 0,
+          "scope": "instance"
+        }
+      }
+    },
+    {
+      "name": "hiwonder_rrc_bus_servo",
+      "class": "hiwonder_rrc_adapter.bus_servo_adapter.HiwonderRRCBusServoAdapter",
+      "iotype_compat": ["servo"],
+      "host_hint": "hiwonder_rrc_board",
+      "parameters": {
+        "board": {
+          "label": "RRC Board ID",
+          "type": "string",
+          "required": true,
+          "scope": "instance"
+        },
+        "servo_id": {
+          "label": "Bus Servo ID",
+          "description": "LX-series servo ID on the bus (1–253).",
+          "type": "number",
+          "min": 1,
+          "max": 253,
+          "required": true,
+          "scope": "instance"
+        },
+        "raw_min": {
+          "label": "Raw Min",
+          "type": "number",
+          "default": 0,
+          "scope": "part"
+        },
+        "raw_max": {
+          "label": "Raw Max",
+          "type": "number",
+          "default": 1000,
+          "scope": "part"
+        },
+        "angle_min_rad": {
+          "label": "Angle Min (rad)",
+          "type": "number",
+          "default": -2.0944,
+          "scope": "part"
+        },
+        "angle_max_rad": {
+          "label": "Angle Max (rad)",
+          "type": "number",
+          "default": 2.0944,
+          "scope": "part"
+        },
+        "default_duration_ms": {
+          "label": "Default Duration (ms)",
+          "type": "number",
+          "default": 200,
+          "scope": "instance"
+        },
+        "state_hz": {
+          "label": "State Publish Rate (Hz)",
+          "type": "number",
+          "default": 5,
+          "min": 0,
+          "scope": "instance"
+        }
+      }
+    }
+  ]
+}

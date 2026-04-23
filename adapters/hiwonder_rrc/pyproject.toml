@@ -1,0 +1,20 @@
+[project]
+name = "polyflow-hiwonder-rrc-adapter"
+version = "0.1.0"
+description = "Polyflow hardware adapter for the Hiwonder RRC Lite controller board (motors, PWM servos, bus servos, IMU, battery)."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Polyflow Robotics" }]
+
+dependencies = [
+    "polyflow-adapter-sdk>=0.1.0",
+    "pyserial>=3.5",
+]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
