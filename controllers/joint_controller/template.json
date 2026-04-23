@@ -1,0 +1,164 @@
+{
+  "type": "controller",
+  "name": "Joint Controller",
+  "entry_point": "joint_controller/node.py",
+  "topics": [
+    {
+      "name": "trajectory",
+      "direction": "subscribe",
+      "msg_type": "trajectory_msgs/JointTrajectoryPoint",
+      "qos": {
+        "reliability": "reliable",
+        "history": "keep_last",
+        "depth": 10
+      }
+    },
+    {
+      "name": "mode",
+      "direction": "subscribe",
+      "msg_type": "std_msgs/String",
+      "allowed_values": ["position", "velocity", "torque"]
+    },
+    {
+      "name": "state",
+      "direction": "publish",
+      "msg_type": "sensor_msgs/JointState",
+      "qos": {
+        "reliability": "best_effort",
+        "history": "keep_last",
+        "depth": 10
+      }
+    }
+  ],
+  "services": [],
+  "actions": [],
+  "parameters_schema": {
+    "joint_id": {
+      "label": "Joint",
+      "requiresInstance": true,
+      "type": "entity",
+      "required": true,
+      "description": "Joint ID this controller manages. Must match an entry in hardware.yaml referencing a joint-capable driver (e.g., odrive_can).",
+      "entity_source": {
+        "selector": "components.io",
+        "filters": { "direction": "output", "type": "joint", "specs.joint_type.value": "revolute,continuous" },
+        "value_field": "_id",
+        "label_field": "name"
+      },
+      "ui": { "group": "Joint", "order": 1 }
+    },
+
+    "default_mode": {
+      "label": "Default Mode",
+      "type": "enum",
+      "values": ["position", "velocity", "torque"],
+      "default": "position",
+      "description": "Initial control mode. Can be changed at runtime via the 'mode' input pin.",
+      "ui": { "group": "Control", "order": 2 }
+    },
+
+    "smoothing_alpha": {
+      "label": "Smoothing Factor",
+      "type": "number",
+      "default": 0.0,
+      "description": "Exponential smoothing factor (0.0 = no smoothing, 0.9 = heavy smoothing). Higher values create smoother motion but slower response. Recommended: 0.3-0.7 for smooth movements.",
+      "ui": { "group": "Control", "order": 3 }
+    },
+
+    "min_angle": {
+      "label": "Min. Rotation",
+      "type": "number",
+      "units": "rad",
+      "source": "entity_property",
+      "editable": false,
+      "binding": {
+        "from_param": "joint_id",
+        "field_path": "specs.lower_position.value"
+      },
+      "ui": { "group": "Limits", "order": 1 }
+    },
+
+    "max_angle": {
+      "label": "Max. Rotation",
+      "type": "number",
+      "units": "rad",
+      "source": "entity_property",
+      "editable": false,
+      "binding": {
+        "from_param": "joint_id",
+        "field_path": "specs.upper_position.value"
+      },
+      "ui": { "group": "Limits", "order": 2 }
+    },
+
+    "position_step": {
+      "label": "Rotation Step",
+      "type": "number",
+      "units": "rad",
+      "source": "entity_property",
+      "editable": false,
+      "binding": {
+        "from_param": "joint_id",
+        "field_path": "specs.position_step.value"
+      },
+      "ui": { "group": "Limits", "order": 3 }
+    },
+
+    "max_effort": {
+      "label": "Max Effort",
+      "type": "number",
+      "units": "Nm",
+      "source": "entity_property",
+      "editable": false,
+      "binding": {
+        "from_param": "joint_id",
+        "field_path": "specs.max_effort.value"
+      },
+      "ui": { "group": "Limits", "order": 4 }
+    },
+
+    "effort_step": {
+      "label": "Effort Step",
+      "type": "number",
+      "units": "Nm",
+      "source": "entity_property",
+      "editable": false,
+      "binding": {
+        "from_param": "joint_id",
+        "field_path": "specs.effort_step.value"
+      },
+      "ui": { "group": "Limits", "order": 5 }
+    },
+
+    "max_velocity": {
+      "label": "Max Velocity",
+      "type": "number",
+      "units": "rad/s",
+      "source": "entity_property",
+      "editable": false,
+      "binding": {
+        "from_param": "joint_id",
+        "field_path": "specs.max_velocity.value"
+      },
+      "ui": { "group": "Limits", "order": 6 }
+    },
+
+    "velocity_step": {
+      "label": "Velocity Step",
+      "type": "number",
+      "units": "rad/s",
+      "source": "entity_property",
+      "editable": false,
+      "binding": {
+        "from_param": "joint_id",
+        "field_path": "specs.velocity_step.value"
+      },
+      "ui": { "group": "Limits", "order": 7 }
+    }
+  },
+  "defaults": {
+    "namespace": "/robot/base",
+    "rate_hz": 150,
+    "lifecycle": true
+  }
+}

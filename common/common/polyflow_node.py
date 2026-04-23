@@ -62,15 +62,15 @@ class PolyflowNode(Node):
     This class automatically handles:
     - Node identification and naming from environment variables.
     - Typed ROS topic publishers/subscribers for each registered pin.
-    - Graph execution state (RUN/PAUSE/STEP/BREAKPOINT_HIT) via the /ros/graph/control topic.
+    - Graph execution state (RUN/PAUSE/STEP/BREAKPOINT_HIT) via the /prp/graph/system/control topic.
     - Breakpoint management: nodes can be paused at specific points.
-    - Status reporting to the /ros/graph/node_status topic.
+    - Status reporting to the /prp/graph/system/status topic.
 
     All portable decision-making logic lives in a PolyflowKernel instance
     (self.kernel). Subclasses should set kernel_class to provide their own
     kernel, or override process_input directly for ROS-specific behaviour.
 
-    Topic convention: /graph/{node_id}/{pin_id}
+    Topic convention: /prp/graph/{node_id}/{pin_id}
     Each output pin publishes on its own typed topic. Each input pin subscribes
     to the source node's output topic as defined in POLYFLOW_INBOUND_CONNECTIONS.
     """
@@ -128,11 +128,11 @@ class PolyflowNode(Node):
         # --- Control & Status (remain as JSON String topics) ---
         self.control_subscription = self.create_subscription(
             String,
-            '/ros/graph/control',
+            '/prp/graph/system/control',
             self._control_message_callback,
             10
         )
-        self.status_publisher = self.create_publisher(String, '/ros/graph/node_status', 10)
+        self.status_publisher = self.create_publisher(String, '/prp/graph/system/status', 10)
         self.status_timer = self.create_timer(1.0, self._publish_status)
 
         # --- Logging (system-level topic, not a pin) ---
@@ -157,14 +157,14 @@ class PolyflowNode(Node):
 
     def register_output_pin(self, pin_id: str, msg_type: type, queue_size: int = 10):
         """
-        Register a typed output pin. Creates a ROS publisher on /graph/{node_id}/{pin_id}.
+        Register a typed output pin. Creates a ROS publisher on /prp/graph/{node_id}/{pin_id}.
 
         Args:
             pin_id: The output pin identifier.
             msg_type: The ROS message type to publish.
             queue_size: Publisher queue depth (default: 10).
         """
-        topic = f"/graph/{self.ros_safe_id}/{pin_id}"
+        topic = f"/prp/graph/{self.ros_safe_id}/{pin_id}"
         self._pin_publishers[pin_id] = self.create_publisher(msg_type, topic, queue_size)
         self._output_pin_types[pin_id] = msg_type
         self.get_logger().info(f"Output pin '{pin_id}' -> {topic} [{msg_type.__name__}]")
@@ -191,7 +191,7 @@ class PolyflowNode(Node):
                 safe_source_id = source_node_id.replace('-', '_')
                 if safe_source_id[0].isdigit():
                     safe_source_id = f"n{safe_source_id}"
-                topic = f"/graph/{safe_source_id}/{source_pin_id}"
+                topic = f"/prp/graph/{safe_source_id}/{source_pin_id}"
 
                 def make_callback(p_id):
                     return lambda msg: self._typed_input_callback(p_id, msg)
@@ -243,7 +243,7 @@ class PolyflowNode(Node):
             data = json.loads(msg.data)
             self.kernel.handle_control(data)
         except json.JSONDecodeError:
-            self.get_logger().error(f"Received invalid JSON on /ros/graph/control: {msg.data}")
+            self.get_logger().error(f"Received invalid JSON on /prp/graph/system/control: {msg.data}")
         except Exception as e:
             self.get_logger().error(f"Error handling control message: {e}")
 
@@ -281,7 +281,7 @@ class PolyflowNode(Node):
 
     def log(self, message: str):
         """
-        Publish a log entry to the shared /graph/log system topic.
+        Publish a log entry to the shared /prp/graph/system/log system topic.
 
         This is picked up by the Logger utility node (if present) without
         requiring explicit pin wiring.
@@ -291,7 +291,7 @@ class PolyflowNode(Node):
         """
         if self._log_publisher is None:
             from polyflow_msgs.msg import LogEntry
-            self._log_publisher = self.create_publisher(LogEntry, '/graph/log', 10)
+            self._log_publisher = self.create_publisher(LogEntry, '/prp/graph/system/log', 10)
             self._log_entry_cls = LogEntry
 
         entry = self._log_entry_cls()

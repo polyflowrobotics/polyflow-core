@@ -14,17 +14,32 @@
   "parameters_schema": {
     "motor_id": {
       "label": "Motor ID",
-      "type": "number",
-      "default": 1,
-      "description": "Motor port ID (1-indexed) on the controller board.",
+      "type": "string",
+      "default": "motor_0",
+      "description": "User-defined hardware ID (e.g., \"left_drive\"). Must match an entry in the node graph's hardware: section.",
       "ui": { "group": "Motor", "order": 1 }
+    },
+    "mode": {
+      "label": "Mode",
+      "type": "string",
+      "default": "speed",
+      "enum": ["speed", "duty"],
+      "description": "SPEED uses rad/s (or driver-native units); DUTY uses a normalized [-1, 1] value.",
+      "ui": { "group": "Motor", "order": 2 }
     },
     "max_speed": {
       "label": "Max Speed",
       "type": "number",
       "default": 1.0,
-      "description": "Maximum allowable speed value.",
-      "ui": { "group": "Motor", "order": 2 }
+      "description": "Clamp for SPEED mode. Ignored in DUTY mode (clamped to [-1, 1]).",
+      "ui": { "group": "Motor", "order": 3 }
+    },
+    "timeout_s": {
+      "label": "Command Timeout (s)",
+      "type": "number",
+      "default": 0.0,
+      "description": "Watchdog timeout applied to every command; 0 uses the driver default.",
+      "ui": { "group": "Motor", "order": 4 }
     }
   },
   "defaults": {

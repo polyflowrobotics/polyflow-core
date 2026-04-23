@@ -10,7 +10,7 @@ class LoggerNode(PolyflowNode):
     """
     Logger utility node.
 
-    Subscribes to the system-level /graph/log topic (published by any node
+    Subscribes to the system-level /prp/graph/system/log topic (published by any node
     via self.log()) and writes entries to a log file and/or stdout.
     No pin wiring required — all nodes can log without explicit connections.
 
@@ -31,7 +31,7 @@ class LoggerNode(PolyflowNode):
         # Subscribe to the shared system log topic (not a pin)
         self.create_subscription(
             LogEntry,
-            '/graph/log',
+            '/prp/graph/system/log',
             self._on_log_entry,
             10
         )

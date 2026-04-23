@@ -1,0 +1,32 @@
+[project]
+name = "polyflow-adapter-sdk"
+version = "0.1.0"
+description = "Base classes and helpers for writing Polyflow hardware adapters."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Polyflow Robotics" }]
+keywords = ["polyflow", "robotics", "hardware", "adapter"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering",
+]
+
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/polyflow/polyflow-core"
+Repository = "https://github.com/polyflow/polyflow-core"
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]

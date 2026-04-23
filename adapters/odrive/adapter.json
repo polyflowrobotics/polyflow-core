@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "name": "odrive",
+  "drivers": [
+    {
+      "name": "odrive_can",
+      "class": "odrive_adapter.can_adapter:ODriveCANAdapter",
+      "iotype_compat": ["joint"],
+      "host_hint": "socketcan_bus",
+      "parameters": {
+        "gear_ratio": {
+          "label": "Gear Ratio",
+          "description": "Motor-shaft to output-shaft reduction (N:1).",
+          "type": "number",
+          "default": 1,
+          "min": 0.0001,
+          "scope": "part"
+        },
+        "torque_constant": {
+          "label": "Torque Constant",
+          "description": "Motor torque constant in N·m / A.",
+          "type": "number",
+          "default": 0.04,
+          "scope": "part",
+          "units": "N·m/A"
+        },
+        "node_id": {
+          "label": "CAN Node ID",
+          "description": "Node ID of this axis on the CAN bus (0–63).",
+          "type": "number",
+          "min": 0,
+          "max": 63,
+          "required": true,
+          "scope": "instance"
+        }
+      }
+    },
+    {
+      "name": "odrive_usb",
+      "class": "odrive_adapter.usb_adapter:ODriveUSBAdapter",
+      "iotype_compat": ["joint"],
+      "parameters": {
+        "gear_ratio": {
+          "label": "Gear Ratio",
+          "type": "number",
+          "default": 1,
+          "min": 0.0001,
+          "scope": "part"
+        },
+        "torque_constant": {
+          "label": "Torque Constant",
+          "type": "number",
+          "default": 0.04,
+          "scope": "part",
+          "units": "N·m/A"
+        },
+        "serial_number": {
+          "label": "Serial Number",
+          "description": "ODrive USB serial — leave blank to auto-discover the first device.",
+          "type": "string",
+          "scope": "instance"
+        }
+      }
+    }
+  ]
+}
