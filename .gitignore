@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.venv/
+.uv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ROS / colcon build artifacts
+build/
+install/
+log/
+
+# IDEs
+.vscode/
+.idea/
+.DS_Store
