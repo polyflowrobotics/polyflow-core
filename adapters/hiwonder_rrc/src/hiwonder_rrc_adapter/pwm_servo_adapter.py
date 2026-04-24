@@ -24,7 +24,6 @@ class HiwonderRRCPWMServoAdapter(HardwareAdapter):
     requires = ["hiwonder_rrc_board"]
 
     def configure(self) -> None:
-        self.board_id = str(self.params.get("board", ""))
         self.channel = int(self.params["channel"])
         self.pulse_min_us = int(self.params.get("pulse_min_us", 500))
         self.pulse_max_us = int(self.params.get("pulse_max_us", 2500))
@@ -45,7 +44,7 @@ class HiwonderRRCPWMServoAdapter(HardwareAdapter):
             self.report_status(
                 LEVEL_ERROR,
                 "board_missing",
-                f"No hiwonder_rrc_board resource for '{self.board_id}'",
+                f"No hiwonder_rrc_board resource for '{self.target_id}'",
             )
             return
         self._rrc = rrc

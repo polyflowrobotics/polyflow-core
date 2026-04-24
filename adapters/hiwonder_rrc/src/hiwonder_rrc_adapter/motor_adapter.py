@@ -35,7 +35,6 @@ class HiwonderRRCMotorAdapter(HardwareAdapter):
     requires = ["hiwonder_rrc_board"]
 
     def configure(self) -> None:
-        self.board_id = str(self.params.get("board", ""))
         self.port = int(self.params["port"])
         self.gear_ratio = float(self.params.get("gear_ratio", 1.0))
         self.invert = bool(self.params.get("invert", False))
@@ -56,7 +55,7 @@ class HiwonderRRCMotorAdapter(HardwareAdapter):
             self.report_status(
                 LEVEL_ERROR,
                 "board_missing",
-                f"No hiwonder_rrc_board resource for '{self.board_id}'",
+                f"No hiwonder_rrc_board resource for '{self.target_id}'",
             )
             return
         self._rrc = rrc

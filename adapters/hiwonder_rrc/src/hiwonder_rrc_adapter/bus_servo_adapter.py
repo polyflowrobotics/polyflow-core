@@ -28,7 +28,6 @@ class HiwonderRRCBusServoAdapter(HardwareAdapter):
     requires = ["hiwonder_rrc_board"]
 
     def configure(self) -> None:
-        self.board_id = str(self.params.get("board", ""))
         self.servo_id = int(self.params["servo_id"])
         self.raw_min = int(self.params.get("raw_min", 0))
         self.raw_max = int(self.params.get("raw_max", 1000))
@@ -50,7 +49,7 @@ class HiwonderRRCBusServoAdapter(HardwareAdapter):
             self.report_status(
                 LEVEL_ERROR,
                 "board_missing",
-                f"No hiwonder_rrc_board resource for '{self.board_id}'",
+                f"No hiwonder_rrc_board resource for '{self.target_id}'",
             )
             return
         self._rrc = rrc

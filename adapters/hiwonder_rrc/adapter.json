@@ -43,13 +43,6 @@
       "iotype_compat": ["joint"],
       "host_hint": "hiwonder_rrc_board",
       "parameters": {
-        "board": {
-          "label": "RRC Board ID",
-          "description": "target_id of the hiwonder_rrc_board entry that owns the serial port.",
-          "type": "string",
-          "required": true,
-          "scope": "instance"
-        },
         "port": {
           "label": "Motor Port",
           "description": "RRC motor channel (1–4).",
@@ -89,12 +82,6 @@
       "iotype_compat": ["joint"],
       "host_hint": "hiwonder_rrc_board",
       "parameters": {
-        "board": {
-          "label": "RRC Board ID",
-          "type": "string",
-          "required": true,
-          "scope": "instance"
-        },
         "channel": {
           "label": "PWM Channel",
           "description": "RRC PWM servo channel (1–4).",
@@ -150,12 +137,6 @@
       "iotype_compat": ["joint"],
       "host_hint": "hiwonder_rrc_board",
       "parameters": {
-        "board": {
-          "label": "RRC Board ID",
-          "type": "string",
-          "required": true,
-          "scope": "instance"
-        },
         "servo_id": {
           "label": "Bus Servo ID",
           "description": "LX-series servo ID on the bus (1–253).",
