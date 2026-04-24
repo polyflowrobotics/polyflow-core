@@ -40,7 +40,7 @@
     {
       "name": "hiwonder_rrc_motor",
       "class": "hiwonder_rrc_adapter.motor_adapter:HiwonderRRCMotorAdapter",
-      "iotype_compat": ["motor"],
+      "iotype_compat": ["joint"],
       "host_hint": "hiwonder_rrc_board",
       "parameters": {
         "board": {
@@ -86,7 +86,7 @@
     {
       "name": "hiwonder_rrc_pwm_servo",
       "class": "hiwonder_rrc_adapter.pwm_servo_adapter.HiwonderRRCPWMServoAdapter",
-      "iotype_compat": ["servo"],
+      "iotype_compat": ["joint"],
       "host_hint": "hiwonder_rrc_board",
       "parameters": {
         "board": {
@@ -147,7 +147,7 @@
     {
       "name": "hiwonder_rrc_bus_servo",
       "class": "hiwonder_rrc_adapter.bus_servo_adapter.HiwonderRRCBusServoAdapter",
-      "iotype_compat": ["servo"],
+      "iotype_compat": ["joint"],
       "host_hint": "hiwonder_rrc_board",
       "parameters": {
         "board": {

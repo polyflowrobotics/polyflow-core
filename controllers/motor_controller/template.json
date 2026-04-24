@@ -13,10 +13,17 @@
   "actions": [],
   "parameters_schema": {
     "motor_id": {
-      "label": "Motor ID",
-      "type": "string",
-      "default": "motor_0",
-      "description": "User-defined hardware ID (e.g., \"left_drive\"). Must match an entry in the node graph's hardware: section.",
+      "label": "Motor",
+      "requiresInstance": true,
+      "type": "entity",
+      "required": true,
+      "description": "Joint this controller drives in open-loop speed/duty mode. Resolves to a joint IO on a Part added to the robot. Serialized to hardware.json at deploy.",
+      "entity_source": {
+        "selector": "components.io",
+        "filters": { "direction": "output", "io_type": "joint" },
+        "value_field": "_id",
+        "label_field": "name"
+      },
       "ui": { "group": "Motor", "order": 1 }
     },
     "mode": {
