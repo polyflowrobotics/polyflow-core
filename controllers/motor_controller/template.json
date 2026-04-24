@@ -28,9 +28,9 @@
     },
     "mode": {
       "label": "Mode",
-      "type": "string",
+      "type": "enum",
+      "values": ["speed", "duty"],
       "default": "speed",
-      "enum": ["speed", "duty"],
       "description": "SPEED uses rad/s (or driver-native units); DUTY uses a normalized [-1, 1] value.",
       "ui": { "group": "Motor", "order": 2 }
     },
