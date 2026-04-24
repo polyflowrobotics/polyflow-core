@@ -41,7 +41,7 @@
       "description": "Joint ID this controller manages. Must match an entry in hardware.yaml referencing a joint-capable driver (e.g., odrive_can).",
       "entity_source": {
         "selector": "components.io",
-        "filters": { "direction": "output", "io_type": "joint", "specs.joint_type.value": "revolute,continuous" },
+        "filters": { "direction": "output", "type": "joint", "specs.joint_type.value": "revolute,continuous" },
         "value_field": "_id",
         "label_field": "name"
       },

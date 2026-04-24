@@ -20,7 +20,7 @@
       "description": "Joint this controller drives in open-loop speed/duty mode. Resolves to a joint IO on a Part added to the robot. Serialized to hardware.json at deploy.",
       "entity_source": {
         "selector": "components.io",
-        "filters": { "direction": "output", "io_type": "joint" },
+        "filters": { "direction": "output", "type": "joint" },
         "value_field": "_id",
         "label_field": "name"
       },
