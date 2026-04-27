@@ -59,6 +59,14 @@
       "default": 2.0,
       "description": "Maximum turning rate for cmd_vel output.",
       "ui": { "group": "Velocity", "order": 2 }
+    },
+    "output_mode": {
+      "label": "cmd_vel Mapping",
+      "type": "string",
+      "default": "diff_drive",
+      "allowed_values": ["diff_drive", "6dof"],
+      "description": "diff_drive fills only linear.x + angular.z (for differential-drive bases). 6dof maps all four sticks plus shoulder/trigger buttons across the full Twist (for pose-controlled arms / IK).",
+      "ui": { "group": "Velocity", "order": 3 }
     }
   },
   "defaults": {

@@ -17,6 +17,11 @@
       "name": "joint_commands",
       "direction": "publish",
       "msg_type": "trajectory_msgs/JointTrajectoryPoint[]"
+    },
+    {
+      "name": "current_pose",
+      "direction": "publish",
+      "msg_type": "geometry_msgs/Pose"
     }
   ],
   "services": [],

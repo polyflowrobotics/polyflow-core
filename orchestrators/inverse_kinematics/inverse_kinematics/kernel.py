@@ -237,6 +237,49 @@ class InverseKinematicsKernel(PolyflowKernel):
         """Get end-effector position for joint angles q."""
         return self._forward_kinematics(q)[-1][:3, 3]
 
+    def _ee_pose(self, q: np.ndarray):
+        """Get end-effector position and orientation (as quaternion x,y,z,w)."""
+        T = self._forward_kinematics(q)[-1]
+        p = T[:3, 3]
+        R = T[:3, :3]
+        # Rotation matrix → quaternion (Shepperd's method)
+        trace = R[0, 0] + R[1, 1] + R[2, 2]
+        if trace > 0.0:
+            s = 0.5 / math.sqrt(trace + 1.0)
+            qw = 0.25 / s
+            qx = (R[2, 1] - R[1, 2]) * s
+            qy = (R[0, 2] - R[2, 0]) * s
+            qz = (R[1, 0] - R[0, 1]) * s
+        elif R[0, 0] > R[1, 1] and R[0, 0] > R[2, 2]:
+            s = 2.0 * math.sqrt(1.0 + R[0, 0] - R[1, 1] - R[2, 2])
+            qw = (R[2, 1] - R[1, 2]) / s
+            qx = 0.25 * s
+            qy = (R[0, 1] + R[1, 0]) / s
+            qz = (R[0, 2] + R[2, 0]) / s
+        elif R[1, 1] > R[2, 2]:
+            s = 2.0 * math.sqrt(1.0 + R[1, 1] - R[0, 0] - R[2, 2])
+            qw = (R[0, 2] - R[2, 0]) / s
+            qx = (R[0, 1] + R[1, 0]) / s
+            qy = 0.25 * s
+            qz = (R[1, 2] + R[2, 1]) / s
+        else:
+            s = 2.0 * math.sqrt(1.0 + R[2, 2] - R[0, 0] - R[1, 1])
+            qw = (R[1, 0] - R[0, 1]) / s
+            qx = (R[0, 2] + R[2, 0]) / s
+            qy = (R[1, 2] + R[2, 1]) / s
+            qz = 0.25 * s
+        return p, (qx, qy, qz, qw)
+
+    def _emit_current_pose(self):
+        if self._current_joint_positions is None:
+            return
+        q = np.array(self._current_joint_positions, dtype=float)
+        p, (qx, qy, qz, qw) = self._ee_pose(q)
+        self.emit("current_pose", {
+            "position": {"x": float(p[0]), "y": float(p[1]), "z": float(p[2])},
+            "orientation": {"x": qx, "y": qy, "z": qz, "w": qw},
+        })
+
     def get_ee_position(self, joint_angles) -> List[float]:
         """Return FK EE position [x, y, z]. Called from logicWorker for calibration."""
         q = np.array(list(joint_angles), dtype=float)
@@ -300,6 +343,8 @@ class InverseKinematicsKernel(PolyflowKernel):
                 combined = data.get("positions", [])
                 if combined:
                     self._current_joint_positions = list(combined)
+
+            self._emit_current_pose()
 
         elif pin_id == "target_pose":
             if self._current_joint_positions is None:

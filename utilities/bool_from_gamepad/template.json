@@ -1,0 +1,44 @@
+{
+  "type": "utility",
+  "name": "Bool From Gamepad",
+  "entry_point": "bool_from_gamepad/node.py",
+  "topics": [
+    {
+      "name": "buttons",
+      "direction": "subscribe",
+      "msg_type": "polyflow_msgs/GamepadButtons"
+    },
+    {
+      "name": "value",
+      "direction": "publish",
+      "msg_type": "std_msgs/Bool"
+    }
+  ],
+  "services": [],
+  "actions": [],
+  "parameters_schema": {
+    "button": {
+      "label": "Button",
+      "type": "string",
+      "default": "a",
+      "allowed_values": ["a", "b", "x", "y", "lb", "rb", "start", "select"],
+      "description": "Which gamepad button's pressed state to forward as a Bool.",
+      "ui": { "group": "Source", "order": 1 }
+    },
+    "invert": {
+      "label": "Invert",
+      "type": "boolean",
+      "default": false,
+      "description": "If true, the published Bool is the *negation* of the button's pressed state.",
+      "ui": { "group": "Source", "order": 2 }
+    },
+    "emit_only_on_change": {
+      "label": "Emit Only on Change",
+      "type": "boolean",
+      "default": true,
+      "description": "If true, only publish when the value actually changes (edge-triggered). If false, every incoming buttons message produces an output.",
+      "ui": { "group": "Source", "order": 3 }
+    }
+  },
+  "defaults": {}
+}

@@ -21,6 +21,7 @@ class InverseKinematicsNode(PolyflowNode):
 
         # Register output pins
         self.register_output_pin("joint_commands", JointTrajectoryPoint)
+        self.register_output_pin("current_pose", Pose)
 
         self.get_logger().info(
             f"InverseKinematics | {len(self.kernel._chain)} joints | "

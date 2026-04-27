@@ -1,0 +1,70 @@
+{
+  "type": "utility",
+  "name": "Twist To Pose",
+  "entry_point": "twist_to_pose/node.py",
+  "topics": [
+    {
+      "name": "cmd_vel",
+      "direction": "subscribe",
+      "msg_type": "geometry_msgs/Twist"
+    },
+    {
+      "name": "seed_pose",
+      "direction": "subscribe",
+      "msg_type": "geometry_msgs/Pose"
+    },
+    {
+      "name": "enable",
+      "direction": "subscribe",
+      "msg_type": "std_msgs/Bool"
+    },
+    {
+      "name": "target_pose",
+      "direction": "publish",
+      "msg_type": "geometry_msgs/Pose"
+    }
+  ],
+  "services": [],
+  "actions": [],
+  "parameters_schema": {
+    "rate_hz": {
+      "label": "Integration Rate",
+      "type": "number",
+      "units": "Hz",
+      "default": 50,
+      "description": "How often to integrate the latest Twist into the running pose.",
+      "ui": { "group": "Integration", "order": 1 }
+    },
+    "frame": {
+      "label": "Twist Frame",
+      "type": "string",
+      "default": "body",
+      "allowed_values": ["body", "world"],
+      "description": "body: linear/angular velocities are interpreted in the current pose's frame (forward = where the EE is pointing). world: velocities apply to fixed world axes.",
+      "ui": { "group": "Integration", "order": 2 }
+    },
+    "require_seed": {
+      "label": "Require Seed Pose",
+      "type": "boolean",
+      "default": true,
+      "description": "If true, no target_pose is emitted until a seed_pose has been received. Prevents the integrator from publishing (0,0,0) before it's anchored.",
+      "ui": { "group": "Integration", "order": 3 }
+    },
+    "require_enable": {
+      "label": "Require Enable",
+      "type": "boolean",
+      "default": true,
+      "description": "If true, velocity is treated as zero whenever enable=false (deadman). On the falling edge, the integrator re-snaps to the last seed_pose so a re-enable starts cleanly.",
+      "ui": { "group": "Integration", "order": 4 }
+    },
+    "ws_min_x": { "label": "Workspace Min X", "type": "number", "units": "m", "description": "Optional lower bound on integrated X position. Leave empty to disable.", "ui": { "group": "Workspace", "order": 1 } },
+    "ws_max_x": { "label": "Workspace Max X", "type": "number", "units": "m", "description": "Optional upper bound on integrated X position. Leave empty to disable.", "ui": { "group": "Workspace", "order": 2 } },
+    "ws_min_y": { "label": "Workspace Min Y", "type": "number", "units": "m", "description": "Optional lower bound on integrated Y position. Leave empty to disable.", "ui": { "group": "Workspace", "order": 3 } },
+    "ws_max_y": { "label": "Workspace Max Y", "type": "number", "units": "m", "description": "Optional upper bound on integrated Y position. Leave empty to disable.", "ui": { "group": "Workspace", "order": 4 } },
+    "ws_min_z": { "label": "Workspace Min Z", "type": "number", "units": "m", "description": "Optional lower bound on integrated Z position. Leave empty to disable.", "ui": { "group": "Workspace", "order": 5 } },
+    "ws_max_z": { "label": "Workspace Max Z", "type": "number", "units": "m", "description": "Optional upper bound on integrated Z position. Leave empty to disable.", "ui": { "group": "Workspace", "order": 6 } }
+  },
+  "defaults": {
+    "rate_hz": 50
+  }
+}
