@@ -37,8 +37,13 @@
     "max_speed": {
       "label": "Max Speed",
       "type": "number",
-      "default": 1.0,
-      "description": "Clamp for SPEED mode. Ignored in DUTY mode (clamped to [-1, 1]).",
+      "units": "rad/s",
+      "source": "entity_property",
+      "editable": false,
+      "binding": {
+        "from_param": "motor_id",
+        "field_path": "specs.max_velocity.value"
+      },
       "ui": { "group": "Motor", "order": 3 }
     },
     "timeout_s": {
