@@ -85,6 +85,12 @@ class TwistToPoseKernel(PolyflowKernel):
         self._enabled = not self.require_enable
         self._was_enabled = self._enabled
 
+        # Diagnostic state — log first arrival of each input and gate state
+        self._got_cmd_vel = False
+        self._got_seed = False
+        self._gate_log_accum = 0
+        self._gate_log_period = max(int(self.rate_hz * 2), 1)  # log gating ~every 2s
+
     def _apply_seed(self, pose: Dict[str, Any]):
         pos = pose.get("position", {}) or {}
         ori = pose.get("orientation", {}) or {"x": 0, "y": 0, "z": 0, "w": 1}
@@ -120,6 +126,9 @@ class TwistToPoseKernel(PolyflowKernel):
             ang = data.get("angular", {}) or {}
             self._linear = [float(lin.get("x", 0.0)), float(lin.get("y", 0.0)), float(lin.get("z", 0.0))]
             self._angular = [float(ang.get("x", 0.0)), float(ang.get("y", 0.0)), float(ang.get("z", 0.0))]
+            if not self._got_cmd_vel:
+                self._got_cmd_vel = True
+                self.log(f"first cmd_vel received: linear={self._linear} angular={self._angular}")
 
         elif pin_id == "seed_pose":
             # Always store the latest seed so falling-edge resnap uses the
@@ -129,6 +138,10 @@ class TwistToPoseKernel(PolyflowKernel):
             self._seed_pose = data
             if not self._seeded:
                 self._apply_seed(data)
+            if not self._got_seed:
+                self._got_seed = True
+                pos = data.get("position", {}) or {}
+                self.log(f"first seed_pose received: ({pos.get('x', 0):.3f}, {pos.get('y', 0):.3f}, {pos.get('z', 0):.3f})")
 
         elif pin_id == "enable":
             value = data.get("data", data) if isinstance(data, dict) else data
@@ -137,16 +150,27 @@ class TwistToPoseKernel(PolyflowKernel):
             # actually is, not where the integrator drifted to.
             if self.require_enable and self._was_enabled and not now_enabled and self._seed_pose is not None:
                 self._apply_seed(self._seed_pose)
+            if now_enabled != self._was_enabled:
+                self.log(f"enable → {now_enabled}")
             self._enabled = now_enabled
             self._was_enabled = now_enabled
 
     def poll(self):
         if not self.should_run(trigger_info={"pin_id": "__tick__"}):
             return
-        if not self._seeded:
-            return
 
-        if self.require_enable and not self._enabled:
+        # Throttled diagnostic so the user can see *why* nothing is being emitted
+        if not self._seeded or (self.require_enable and not self._enabled):
+            self._gate_log_accum += 1
+            if self._gate_log_accum >= self._gate_log_period:
+                self._gate_log_accum = 0
+                self.log(
+                    f"gated: seeded={self._seeded} enabled={self._enabled} "
+                    f"got_cmd_vel={self._got_cmd_vel} got_seed={self._got_seed}"
+                )
+            if not self._seeded:
+                return
+            # Enabled gate closed — still emit the held pose so downstream stays warm
             self._emit_pose()
             return
 
