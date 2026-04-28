@@ -46,12 +46,19 @@
       },
       "ui": { "group": "Motor", "order": 3 }
     },
+    "reverse": {
+      "label": "Reverse Direction",
+      "type": "boolean",
+      "default": false,
+      "description": "Negate command before emitting. Use for motors mounted mirrored from the convention (e.g. left-side drive wheels).",
+      "ui": { "group": "Motor", "order": 4 }
+    },
     "timeout_s": {
       "label": "Command Timeout (s)",
       "type": "number",
       "default": 0.0,
       "description": "Watchdog timeout applied to every command; 0 uses the driver default.",
-      "ui": { "group": "Motor", "order": 4 }
+      "ui": { "group": "Motor", "order": 5 }
     }
   },
   "defaults": {

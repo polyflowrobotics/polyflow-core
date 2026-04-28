@@ -33,6 +33,9 @@ class MotorControllerKernel(PolyflowKernel):
         motor_id:   User-defined string ID (e.g., "left_drive").
         max_speed:  Clamp for SPEED mode. Ignored in DUTY mode (clamps to [-1, 1]).
         mode:       "speed" (default) or "duty".
+        reverse:    Negate command before emitting; for motors mounted
+                    mirrored from the convention (e.g. left-side drive
+                    wheels whose joint axis points opposite the right side).
         timeout_s:  Watchdog seconds applied to every command; 0 = adapter default.
     """
 
@@ -43,6 +46,7 @@ class MotorControllerKernel(PolyflowKernel):
         mode_str = str(self.get_param("mode", "speed")).lower().strip()
         self.mode = _MODE_NAMES.get(mode_str, _MODE_SPEED)
 
+        self.reverse = bool(self.get_param("reverse", False))
         self.timeout_s = float(self.get_param("timeout_s", 0.0))
 
         self._current_value = 0.0
@@ -55,6 +59,8 @@ class MotorControllerKernel(PolyflowKernel):
             return
 
         raw = float(data.get("data", 0.0))
+        if self.reverse:
+            raw = -raw
         if self.mode == _MODE_DUTY:
             self._current_value = max(-1.0, min(1.0, raw))
         else:
