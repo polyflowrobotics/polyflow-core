@@ -24,6 +24,9 @@ class ModeSwitcherKernel(PolyflowKernel):
             self.log(f"Default mode '{self._current_mode}' not in allowed modes, falling back to 'stopped'")
             self._current_mode = "stopped"
 
+    def post_setup(self):
+        self.broadcast_mode()
+
     def broadcast_mode(self):
         self.emit("mode", {"mode": self._current_mode})
 

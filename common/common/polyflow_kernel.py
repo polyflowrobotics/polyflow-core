@@ -61,6 +61,13 @@ class PolyflowKernel:
         """Override to perform initialisation after parameters are available."""
         pass
 
+    def post_setup(self):
+        """Override to perform initialisation that needs the on_emit/on_log
+        callbacks. Called by the host wrapper after callbacks are attached.
+        Use this for any startup emits — emitting from setup() drops the
+        message because the callbacks aren't wired yet."""
+        pass
+
     def get_param(self, keys: Union[str, List[str]], default: Any = None) -> Any:
         if isinstance(keys, str):
             keys = [keys]
