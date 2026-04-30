@@ -62,9 +62,9 @@ class PolyflowNode(Node):
     This class automatically handles:
     - Node identification and naming from environment variables.
     - Typed ROS topic publishers/subscribers for each registered pin.
-    - Graph execution state (RUN/PAUSE/STEP/BREAKPOINT_HIT) via the /prp/graph/system/control topic.
+    - Graph execution state (RUN/PAUSE/STEP/BREAKPOINT_HIT) via the /prp/graph/runtime/control topic.
     - Breakpoint management: nodes can be paused at specific points.
-    - Status reporting to the /prp/graph/system/status topic.
+    - Status reporting to the /prp/graph/runtime/status topic.
 
     All portable decision-making logic lives in a PolyflowKernel instance
     (self.kernel). Subclasses should set kernel_class to provide their own
@@ -128,11 +128,11 @@ class PolyflowNode(Node):
         # --- Control & Status (remain as JSON String topics) ---
         self.control_subscription = self.create_subscription(
             String,
-            '/prp/graph/system/control',
+            '/prp/graph/runtime/control',
             self._control_message_callback,
             10
         )
-        self.status_publisher = self.create_publisher(String, '/prp/graph/system/status', 10)
+        self.status_publisher = self.create_publisher(String, '/prp/graph/runtime/status', 10)
         self.status_timer = self.create_timer(1.0, self._publish_status)
 
         # --- Logging (system-level topic, not a pin) ---
@@ -172,8 +172,9 @@ class PolyflowNode(Node):
     def register_input_pin(self, pin_id: str, msg_type: type, queue_size: int = 10):
         """
         Register a typed input pin. Creates ROS subscribers for each inbound
-        connection that targets this pin, subscribing to the source node's
-        output topic.
+        connection that targets this pin, plus a direct-injection subscriber
+        on /prp/nodes/{node_id}/inputs/{pin_id} so external clients (e.g. the
+        studio UI sliders or IK gizmo) can push values into the pin.
 
         Args:
             pin_id: The input pin identifier.
@@ -181,6 +182,9 @@ class PolyflowNode(Node):
             queue_size: Subscriber queue depth (default: 10).
         """
         self._input_pin_types[pin_id] = msg_type
+
+        def make_callback(p_id):
+            return lambda msg: self._typed_input_callback(p_id, msg)
 
         # Find all inbound connections targeting this pin and subscribe to each source
         sources_found = False
@@ -193,9 +197,6 @@ class PolyflowNode(Node):
                     safe_source_id = f"n{safe_source_id}"
                 topic = f"/prp/graph/{safe_source_id}/{source_pin_id}"
 
-                def make_callback(p_id):
-                    return lambda msg: self._typed_input_callback(p_id, msg)
-
                 sub = self.create_subscription(
                     msg_type,
                     topic,
@@ -205,6 +206,20 @@ class PolyflowNode(Node):
                 self._pin_subscribers[f"{pin_id}:{source_node_id}:{source_pin_id}"] = sub
                 self.get_logger().info(f"Input pin '{pin_id}' <- {topic} [{msg_type.__name__}]")
                 sources_found = True
+
+        # Direct-injection topic for external clients (studio).
+        safe_self_id = self.node_id.replace('-', '_')
+        if safe_self_id[0].isdigit():
+            safe_self_id = f"n{safe_self_id}"
+        injection_topic = f"/prp/nodes/{safe_self_id}/inputs/{pin_id}"
+        injection_sub = self.create_subscription(
+            msg_type,
+            injection_topic,
+            make_callback(pin_id),
+            queue_size
+        )
+        self._pin_subscribers[f"{pin_id}:__inject__"] = injection_sub
+        self.get_logger().info(f"Input pin '{pin_id}' <- {injection_topic} [direct injection]")
 
         if not sources_found:
             self.get_logger().debug(f"Input pin '{pin_id}' registered but no inbound connections found")
@@ -243,7 +258,7 @@ class PolyflowNode(Node):
             data = json.loads(msg.data)
             self.kernel.handle_control(data)
         except json.JSONDecodeError:
-            self.get_logger().error(f"Received invalid JSON on /prp/graph/system/control: {msg.data}")
+            self.get_logger().error(f"Received invalid JSON on /prp/graph/runtime/control: {msg.data}")
         except Exception as e:
             self.get_logger().error(f"Error handling control message: {e}")
 
@@ -281,7 +296,7 @@ class PolyflowNode(Node):
 
     def log(self, message: str):
         """
-        Publish a log entry to the shared /prp/graph/system/log system topic.
+        Publish a log entry to the shared /prp/graph/runtime/log system topic.
 
         This is picked up by the Logger utility node (if present) without
         requiring explicit pin wiring.
@@ -291,7 +306,7 @@ class PolyflowNode(Node):
         """
         if self._log_publisher is None:
             from polyflow_msgs.msg import LogEntry
-            self._log_publisher = self.create_publisher(LogEntry, '/prp/graph/system/log', 10)
+            self._log_publisher = self.create_publisher(LogEntry, '/prp/graph/runtime/log', 10)
             self._log_entry_cls = LogEntry
 
         entry = self._log_entry_cls()

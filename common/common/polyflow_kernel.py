@@ -114,7 +114,7 @@ class PolyflowKernel:
 
         command = data.get("command")
 
-        if command == "set_state":
+        if command == "set_run_state":
             new_state = data.get("state", "RUN")
             if self._run_state == "BREAKPOINT_HIT" and new_state == "PAUSE":
                 return
