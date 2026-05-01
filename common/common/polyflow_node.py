@@ -223,7 +223,7 @@ class PolyflowNode(Node):
             queue_size
         )
         self._pin_subscribers[f"{pin_id}:__inject__"] = injection_sub
-        self.get_logger().info(f"Input pin '{pin_id}' <- {injection_topic} [direct injection]")
+        self.get_logger().info(f"Input pin '{pin_id}' <- {injection_topic} [direct injection, {msg_type.__name__}]")
 
         if not sources_found:
             self.get_logger().debug(f"Input pin '{pin_id}' registered but no inbound connections found")
@@ -238,6 +238,7 @@ class PolyflowNode(Node):
     def _injection_input_callback(self, pin_id: str, msg: Any):
         """Direct-injection variant — traces the input before routing."""
         self._trace_pin("INJ", pin_id, msg)
+        self.get_logger().info(f"Direct injection on pin '{pin_id}': {msg}")
         self._typed_input_callback(pin_id, msg)
 
     # --- Helpers ---
