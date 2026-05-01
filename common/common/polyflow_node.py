@@ -219,7 +219,7 @@ class PolyflowNode(Node):
         injection_sub = self.create_subscription(
             msg_type,
             injection_topic,
-            make_callback(pin_id),
+            lambda msg, p_id=pin_id: self._injection_input_callback(p_id, msg),
             queue_size
         )
         self._pin_subscribers[f"{pin_id}:__inject__"] = injection_sub
@@ -230,11 +230,15 @@ class PolyflowNode(Node):
 
     def _typed_input_callback(self, pin_id: str, msg: Any):
         """Routes incoming typed messages to process_input."""
-        self._trace_pin("IN", pin_id, msg)
         try:
             self.process_input(pin_id, msg)
         except Exception as e:
             self.get_logger().error(f"Error processing input on pin '{pin_id}': {e}")
+
+    def _injection_input_callback(self, pin_id: str, msg: Any):
+        """Direct-injection variant — traces the input before routing."""
+        self._trace_pin("INJ", pin_id, msg)
+        self._typed_input_callback(pin_id, msg)
 
     # --- Helpers ---
 

@@ -77,6 +77,7 @@ class JointControllerNode(PolyflowNode):
         msg = _dict_to_ros_msg(data, JointCommand)
         msg.stamp = self.get_clock().now().to_msg()
         self._cmd_publisher.publish(msg)
+        self._trace_pin("OUT", "joint_command", msg)
 
     def _on_prp_joint_state(self, msg: JointState) -> None:
         """Forward hardware feedback to the kernel (which re-emits on the graph state pin)."""

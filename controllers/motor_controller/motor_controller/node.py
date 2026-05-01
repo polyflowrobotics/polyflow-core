@@ -44,6 +44,7 @@ class MotorControllerNode(PolyflowNode):
         msg = _dict_to_ros_msg(data, MotorCommand)
         msg.stamp = self.get_clock().now().to_msg()
         self._motor_cmd_publisher.publish(msg)
+        self._trace_pin("OUT", "hw_motor_command", msg)
 
     async def run_async(self):
         self.get_logger().info(f"MotorController motor_id={self.kernel.motor_id} ready")
