@@ -58,6 +58,7 @@ class MotorControllerKernel(PolyflowKernel):
         if pin_id != "command":
             return
 
+        self.log(f"motor_controller got {data}")
         raw = float(data.get("data", 0.0))
         if self.reverse:
             raw = -raw
