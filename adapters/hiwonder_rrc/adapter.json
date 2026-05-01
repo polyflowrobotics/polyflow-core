@@ -11,7 +11,7 @@
           "label": "Serial Device",
           "description": "USB serial path for the RRC board.",
           "type": "string",
-          "default": "/dev/ttyAMA0",
+          "default": "/dev/ttyACM0",
           "scope": "instance"
         },
         "baud": {

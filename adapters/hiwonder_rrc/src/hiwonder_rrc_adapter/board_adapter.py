@@ -27,7 +27,7 @@ class HiwonderRRCBoardAdapter(HardwareAdapter):
     state_types = ["Imu", "BatteryState"]
 
     def configure(self) -> None:
-        self.device = str(self.params.get("device", "/dev/ttyAMA0"))
+        self.device = str(self.params.get("device", "/dev/ttyACM0"))
         self.baud = int(self.params.get("baud", 1_000_000))
         self.poll_hz = float(self.params.get("poll_hz", 100.0))
         self.battery_cells = int(self.params.get("battery_cells", 0))

@@ -18,7 +18,7 @@ hardware:
   - id: rrc0
     driver: hiwonder_rrc_board
     params:
-      device: /dev/ttyAMA0
+      device: /dev/ttyACM0
       baud: 1000000
       poll_hz: 100
 

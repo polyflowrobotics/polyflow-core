@@ -94,14 +94,14 @@ class HiwonderRRC:
     frames and routes them to per-function queues.
 
     Args:
-        port: Serial device path (default: /dev/ttyAMA0).
+        port: Serial device path (default: /dev/ttyACM0).
         baudrate: Baud rate (default: 1000000).
         timeout: Serial read timeout in seconds (default: 0.1).
     """
 
     def __init__(
         self,
-        port: str = "/dev/ttyAMA0",
+        port: str = "/dev/ttyACM0",
         baudrate: int = 1_000_000,
         timeout: float = 0.1,
     ):
