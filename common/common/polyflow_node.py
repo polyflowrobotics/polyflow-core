@@ -141,6 +141,9 @@ class PolyflowNode(Node):
 
         # --- Per-node trace log (pin IN/OUT) ---
         self._node_log_file = self._open_node_log()
+        # Last content-signature per "{direction}:{pin_id}" so we suppress
+        # consecutive identical traces (motors etc. spam unchanged commands).
+        self._last_trace_sig: Dict[str, str] = {}
 
     # --- Kernel callbacks ---
 
@@ -260,6 +263,11 @@ class PolyflowNode(Node):
         """Write a single IN/OUT line to the per-node trace log."""
         if self._node_log_file is None:
             return
+        sig = self._trace_signature(msg)
+        key = f"{direction}:{pin_id}"
+        if self._last_trace_sig.get(key) == sig:
+            return
+        self._last_trace_sig[key] = sig
         try:
             ts = datetime.now().isoformat(timespec="milliseconds")
             msg_repr = repr(msg)
@@ -268,6 +276,21 @@ class PolyflowNode(Node):
             self._node_log_file.write(f"{ts} {direction:<3} {pin_id} {msg_repr}\n")
         except OSError:
             pass
+
+    def _trace_signature(self, msg: Any) -> str:
+        """Stable repr of a message's content, ignoring timestamp fields so
+        repeated commands with fresh stamps still compare equal."""
+        def strip(value: Any) -> Any:
+            if hasattr(value, "get_fields_and_field_types"):
+                return {
+                    name: strip(getattr(value, name))
+                    for name in value.get_fields_and_field_types()
+                    if name != "stamp"
+                }
+            if isinstance(value, (list, tuple)):
+                return [strip(item) for item in value]
+            return value
+        return repr(strip(msg))
 
     def _load_json_env(self, key: str, default: Any) -> Any:
         """Safely loads a JSON string from an environment variable."""
