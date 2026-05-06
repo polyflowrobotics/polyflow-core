@@ -39,6 +39,7 @@ class HiwonderRRCMotorAdapter(HardwareAdapter):
         self.gear_ratio = float(self.params.get("gear_ratio", 1.0))
         self.invert = bool(self.params.get("invert", False))
         self.state_hz = float(self.params.get("state_hz", 10.0))
+        self.debug_log = bool(self.params.get("debug_log", False))
 
         self._rrc: Optional[HiwonderRRC] = None
         self._state_handle: Any = None
@@ -122,11 +123,15 @@ class HiwonderRRCMotorAdapter(HardwareAdapter):
     def _write_speed_rps(self, rps: float) -> None:
         if self._rrc is None:
             return
+        if self.debug_log:
+            self.log(f"port={self.port} write speed_rps={rps:+.4f}")
         self._rrc.set_motor_speed([(self.port, float(rps))])
 
     def _write_duty_pct(self, duty: float) -> None:
         if self._rrc is None:
             return
+        if self.debug_log:
+            self.log(f"port={self.port} write duty_pct={duty:+.2f}")
         self._rrc.set_motor_duty([(self.port, float(duty))])
 
     def _write_active_stop(self) -> None:
@@ -134,6 +139,8 @@ class HiwonderRRCMotorAdapter(HardwareAdapter):
         # PID target" — wheels coast indefinitely. set_motor_duty(0) shorts
         # the H-bridge for an active brake. We send both so the PID setpoint
         # is also reset for the next non-zero speed command.
+        if self.debug_log:
+            self.log(f"port={self.port} active_stop")
         self._write_speed_rps(0.0)
         self._write_duty_pct(0.0)
 
