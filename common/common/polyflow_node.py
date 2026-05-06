@@ -233,6 +233,7 @@ class PolyflowNode(Node):
 
     def _typed_input_callback(self, pin_id: str, msg: Any):
         """Routes incoming typed messages to process_input."""
+        self._trace_pin("IN", pin_id, msg)
         try:
             self.process_input(pin_id, msg)
         except Exception as e:

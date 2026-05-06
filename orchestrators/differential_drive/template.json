@@ -4,14 +4,14 @@
   "entry_point": "differential_drive/node.py",
   "topics": [
     {
-      "name": "cmd_vel",
+      "name": "cmd_vel_teleop",
       "direction": "subscribe",
       "msg_type": "geometry_msgs/Twist"
     },
     {
-      "name": "mode",
+      "name": "cmd_vel_automated",
       "direction": "subscribe",
-      "msg_type": "polyflow_msgs/ModeState"
+      "msg_type": "geometry_msgs/Twist"
     },
     {
       "name": "front_left_motor",
@@ -60,6 +60,14 @@
       "default": 1.0,
       "description": "Maximum wheel speed in m/s.",
       "ui": { "group": "Kinematics", "order": 3 }
+    },
+    "teleop_timeout_s": {
+      "label": "Teleop Timeout",
+      "type": "number",
+      "units": "s",
+      "default": 1.0,
+      "description": "Seconds without a teleop message before falling back to automated commands.",
+      "ui": { "group": "Priority", "order": 1 }
     }
   },
   "defaults": {
