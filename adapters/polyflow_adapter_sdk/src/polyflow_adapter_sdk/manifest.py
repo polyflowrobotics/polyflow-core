@@ -9,7 +9,7 @@ drivers it provides. system-manager scans these at startup to build a
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List, Union
+from typing import List, Optional, Union
 
 
 @dataclass
@@ -17,10 +17,15 @@ class DriverEntry:
     """A single driver declared by an adapter package."""
 
     name: str
-    """Driver identifier referenced by hardware.yaml (e.g., "odrive_can")."""
+    """Driver identifier referenced by hardware.json (e.g., "odrive_can")."""
 
     class_path: str
     """Python class path in the form "module.submodule:ClassName"."""
+
+    host_hint: Optional[str] = None
+    """Name of another driver in the same adapter that hosts this one
+    (e.g. a bus/board driver for a motor driver). system-manager uses this
+    to bind the consumer driver to its adapter instance at startup."""
 
 
 @dataclass
@@ -49,7 +54,11 @@ class Manifest:
             schema_version=int(data.get("schema_version", 1)),
             name=str(data["name"]),
             drivers=[
-                DriverEntry(name=str(d["name"]), class_path=str(d["class"]))
+                DriverEntry(
+                    name=str(d["name"]),
+                    class_path=str(d["class"]),
+                    host_hint=str(d["host_hint"]) if d.get("host_hint") else None,
+                )
                 for d in data.get("drivers", [])
             ],
         )
@@ -60,6 +69,11 @@ class Manifest:
             "schema_version": self.schema_version,
             "name": self.name,
             "drivers": [
-                {"name": d.name, "class": d.class_path} for d in self.drivers
+                {
+                    "name": d.name,
+                    "class": d.class_path,
+                    **({"host_hint": d.host_hint} if d.host_hint else {}),
+                }
+                for d in self.drivers
             ],
         }
