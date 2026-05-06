@@ -73,6 +73,13 @@
           "default": 10,
           "min": 0,
           "scope": "instance"
+        },
+        "debug_log": {
+          "label": "Debug Log Writes",
+          "description": "Log every speed/duty packet sent to the RRC board. Useful for diagnosing motor stop/start behaviour; noisy in steady-state teleop.",
+          "type": "boolean",
+          "default": false,
+          "scope": "instance"
         }
       }
     },
