@@ -60,8 +60,7 @@ class HiwonderRRCMotorAdapter(HardwareAdapter):
             return
         self._rrc = rrc
 
-        # Ensure channel starts stopped.
-        self._write_speed_rps(0.0)
+        self._write_active_stop()
 
         if self.state_hz > 0:
             self._state_handle = self.schedule_poll(self.state_hz, self._publish_state)
@@ -78,7 +77,7 @@ class HiwonderRRCMotorAdapter(HardwareAdapter):
         if self._rrc is None:
             return
         if not self._enabled:
-            self._write_speed_rps(0.0)
+            self._write_active_stop()
             return
 
         mode = int(data.get("mode", MOTOR_MODE_IDLE))
@@ -87,13 +86,16 @@ class HiwonderRRCMotorAdapter(HardwareAdapter):
 
         try:
             if mode == MOTOR_MODE_SPEED:
-                rps = (value / _TWO_PI) * self.gear_ratio
-                self._write_speed_rps(-rps if self.invert else rps)
+                if value == 0.0:
+                    self._write_active_stop()
+                else:
+                    rps = (value / _TWO_PI) * self.gear_ratio
+                    self._write_speed_rps(-rps if self.invert else rps)
             elif mode == MOTOR_MODE_DUTY:
                 duty_pct = max(-1.0, min(1.0, value)) * 100.0
                 self._write_duty_pct(-duty_pct if self.invert else duty_pct)
             elif mode == MOTOR_MODE_IDLE:
-                self._write_speed_rps(0.0)
+                self._write_active_stop()
                 value = 0.0
             else:
                 self.report_status(LEVEL_WARN, "unknown_mode", f"MotorCommand.mode={mode}")
@@ -127,9 +129,17 @@ class HiwonderRRCMotorAdapter(HardwareAdapter):
             return
         self._rrc.set_motor_duty([(self.port, float(duty))])
 
+    def _write_active_stop(self) -> None:
+        # RRC firmware treats set_motor_speed(0) as "no command, hold last
+        # PID target" — wheels coast indefinitely. set_motor_duty(0) shorts
+        # the H-bridge for an active brake. We send both so the PID setpoint
+        # is also reset for the next non-zero speed command.
+        self._write_speed_rps(0.0)
+        self._write_duty_pct(0.0)
+
     def _safe_stop(self) -> None:
         try:
-            self._write_speed_rps(0.0)
+            self._write_active_stop()
         except Exception as exc:
             self.log(f"safe stop failed: {exc}")
         self._mode = MOTOR_MODE_IDLE
