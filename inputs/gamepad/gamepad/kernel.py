@@ -98,6 +98,11 @@ class GamepadKernel(PolyflowKernel):
         buttons: dict = None,
     ):
         """Emit axes, buttons, and computed cmd_vel from raw gamepad values."""
+        left_x = self._apply_deadzone(left_x)
+        left_y = self._apply_deadzone(left_y)
+        right_x = self._apply_deadzone(right_x)
+        right_y = self._apply_deadzone(right_y)
+
         axes = {
             "left_x": left_x, "left_y": left_y,
             "right_x": right_x, "right_y": right_y,
@@ -135,9 +140,13 @@ class GamepadKernel(PolyflowKernel):
                 },
             }
         else:
+            # Single-stick skid steer: left stick Y drives forward/back, left
+            # stick X turns. ROS body-frame: +x forward, +z yaw CCW. Browser
+            # stick Y is positive when pushed down and X positive when pushed
+            # right, so both axes get negated.
             twist = {
-                "linear": {"x": left_y * self.max_linear_speed, "y": 0.0, "z": 0.0},
-                "angular": {"x": 0.0, "y": 0.0, "z": right_x * self.max_angular_speed},
+                "linear": {"x": -left_y * self.max_linear_speed, "y": 0.0, "z": 0.0},
+                "angular": {"x": 0.0, "y": 0.0, "z": -left_x * self.max_angular_speed},
             }
         self._maybe_emit("cmd_vel", twist, self._twist_changed)
 
