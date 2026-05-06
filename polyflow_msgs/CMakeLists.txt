@@ -14,8 +14,6 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/JointCommand.msg"
   "msg/JointState.msg"
   "msg/LogEntry.msg"
-  "msg/ModeCommand.msg"
-  "msg/ModeState.msg"
   "msg/MotorCommand.msg"
   "msg/MotorState.msg"
   "msg/ServoCommand.msg"
