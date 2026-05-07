@@ -346,16 +346,19 @@ class HiwonderRRC:
 
     def stop_motor(self, motor_id: int):
         """
-        Stop a single motor via the documented protocol stop command.
+        Stop a single motor.
 
-        Unlike set_motor_speed(0) — which the firmware treats as "no
-        command, hold last target" — this actually halts the motor.
+        Routes through the bitmask stop sub-command (`MOTOR_SUB_STOP_MASK`)
+        rather than the per-channel sub-command (`MOTOR_SUB_STOP_SINGLE`),
+        because at least one shipping RRC firmware variant only slows the
+        motor slightly in response to the per-channel form, while it halts
+        cleanly on a single-bit mask. `set_motor_speed(0)` is also unusable
+        as a halt — the firmware treats it as "no command, hold last target".
 
         Args:
-            motor_id: 1-indexed motor ID (1-4); converted to 0-indexed
-                      on the wire to match set_motor_speed.
+            motor_id: 1-indexed motor ID (1-4).
         """
-        self._send(Func.MOTOR, [MOTOR_SUB_STOP_SINGLE, motor_id - 1])
+        self.stop_motors_mask(1 << (motor_id - 1))
 
     def stop_motors_mask(self, mask: int):
         """
