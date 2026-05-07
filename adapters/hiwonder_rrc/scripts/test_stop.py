@@ -118,7 +118,9 @@ Multi:
   k)  ALL motors stop, mask=0x0F
   n)  speed=0 via sub-cmd 0x01 (multi count=1) doc-indexed
   o)  speed=0 via sub-cmd 0x01 (multi count=1) our-indexed
-  s)  sustained speed=-1 via sub-cmd 0x01 our-indexed (PID brake, no stop after)
+  s)  sustained speed=-1 via sub-cmd 0x01 our-indexed (single packet)
+  s5) loop: speed=-1 every 200ms for 5 sec (simulate gamepad-rate brake)
+  s2) loop: speed=-0.5 every 200ms for 5 sec (gentler brake)
 
 Deadband search — find the smallest target the firmware honors:
   v1) speed=+0.01 via sub-cmd 0x01 our-indexed (very slow — should hold near 0)
@@ -231,7 +233,15 @@ def main():
                      "speed=0, sub-cmd 0x01 our-indexed (production form)")
             elif choice == "s":
                 send(rrc, speed_multi([(our_idx, -1.0)]),
-                     "sustained speed=-1, sub-cmd 0x01 our-indexed (PID brake)")
+                     "speed=-1, sub-cmd 0x01 our-indexed (PID brake, single packet)")
+            elif choice in ("s5", "s2"):
+                rate = -1.0 if choice == "s5" else -0.5
+                print(f"  looping speed={rate} every 200ms for 5 sec...")
+                for _ in range(25):
+                    send(rrc, speed_multi([(our_idx, rate)]),
+                         f"  loop tick speed={rate}")
+                    time.sleep(0.2)
+                print("  loop done.")
             elif choice in ("v1", "v2", "v3", "v4", "v5"):
                 target = {"v1": 0.01, "v2": 0.05, "v3": 0.1, "v4": 0.5, "v5": 1.0}[choice]
                 send(rrc, speed_multi([(our_idx, target)]),
