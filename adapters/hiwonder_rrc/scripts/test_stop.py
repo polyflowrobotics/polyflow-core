@@ -16,14 +16,21 @@ Usage:
 """
 
 import argparse
+import importlib.util
 import struct
 import sys
 import time
+from pathlib import Path
 
-# Allow running as a script from the adapters/hiwonder_rrc/ dir without install.
-sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parents[1] / "src"))
-
-from hiwonder_rrc_adapter.rrc import HiwonderRRC, Func, _crc8  # noqa: E402
+# Load rrc.py as a standalone module (skipping hiwonder_rrc_adapter/__init__.py,
+# which imports the SDK-dependent adapter classes we don't need here).
+_RRC_PATH = Path(__file__).resolve().parents[1] / "src" / "hiwonder_rrc_adapter" / "rrc.py"
+_spec = importlib.util.spec_from_file_location("rrc", _RRC_PATH)
+rrc_mod = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(rrc_mod)
+HiwonderRRC = rrc_mod.HiwonderRRC
+Func = rrc_mod.Func
+_crc8 = rrc_mod._crc8
 
 
 # Sub-command bytes from the official RRCLite protocol PDF.
