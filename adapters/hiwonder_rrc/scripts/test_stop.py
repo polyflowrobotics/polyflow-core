@@ -116,6 +116,16 @@ Active brake (combo):
 
 Multi:
   k)  ALL motors stop, mask=0x0F
+  n)  speed=0 via sub-cmd 0x01 (multi count=1) doc-indexed
+  o)  speed=0 via sub-cmd 0x01 (multi count=1) our-indexed
+  s)  sustained speed=-1 via sub-cmd 0x01 our-indexed (PID brake, no stop after)
+
+Deadband search — find the smallest target the firmware honors:
+  v1) speed=+0.01 via sub-cmd 0x01 our-indexed (very slow — should hold near 0)
+  v2) speed=+0.05
+  v3) speed=+0.1
+  v4) speed=+0.5
+  v5) speed=+1.0
 
 Other:
   m N) switch to motor port N (1-4)
@@ -213,6 +223,19 @@ def main():
                 send(rrc, stop_mask(mask_doc), f"step 2: stop mask 0x{mask_doc:02X}")
             elif choice == "k":
                 send(rrc, stop_mask(0x0F), "stop mask 0x0F (all motors)")
+            elif choice == "n":
+                send(rrc, speed_multi([(doc_idx, 0.0)]),
+                     "speed=0, sub-cmd 0x01 doc-indexed (production form)")
+            elif choice == "o":
+                send(rrc, speed_multi([(our_idx, 0.0)]),
+                     "speed=0, sub-cmd 0x01 our-indexed (production form)")
+            elif choice == "s":
+                send(rrc, speed_multi([(our_idx, -1.0)]),
+                     "sustained speed=-1, sub-cmd 0x01 our-indexed (PID brake)")
+            elif choice in ("v1", "v2", "v3", "v4", "v5"):
+                target = {"v1": 0.01, "v2": 0.05, "v3": 0.1, "v4": 0.5, "v5": 1.0}[choice]
+                send(rrc, speed_multi([(our_idx, target)]),
+                     f"deadband search: speed={target} via sub-cmd 0x01 our-indexed")
             else:
                 print("?")
     finally:
