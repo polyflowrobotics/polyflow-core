@@ -27,8 +27,8 @@ class HiwonderRRCPWMServoAdapter(HardwareAdapter):
         self.channel = int(self.params["channel"])
         self.pulse_min_us = int(self.params.get("pulse_min_us", 500))
         self.pulse_max_us = int(self.params.get("pulse_max_us", 2500))
-        self.angle_min_rad = float(self.params.get("angle_min_rad", -1.5708))
-        self.angle_max_rad = float(self.params.get("angle_max_rad", 1.5708))
+        self.angle_min_rad = float(self.params.get("pwm_angle_min_rad", -1.5708))
+        self.angle_max_rad = float(self.params.get("pwm_angle_max_rad", 1.5708))
         self.default_duration_ms = int(self.params.get("default_duration_ms", 20))
         self.state_hz = float(self.params.get("state_hz", 10.0))
 

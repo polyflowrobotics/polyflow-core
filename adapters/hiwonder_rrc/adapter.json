@@ -1,6 +1,55 @@
 {
   "schema_version": 1,
   "name": "hiwonder_rrc",
+  "parameters": {
+    "gear_ratio": {
+      "label": "Motor Gear Ratio",
+      "description": "Motor-shaft to output-shaft reduction (N:1) for the brushed-motor channels. SPEED commands are in output rad/s.",
+      "type": "number",
+      "default": 1.0,
+      "min": 0.0001
+    },
+    "pulse_min_us": {
+      "label": "PWM Servo Pulse Min (µs)",
+      "type": "number",
+      "default": 500
+    },
+    "pulse_max_us": {
+      "label": "PWM Servo Pulse Max (µs)",
+      "type": "number",
+      "default": 2500
+    },
+    "pwm_angle_min_rad": {
+      "label": "PWM Servo Angle Min (rad)",
+      "type": "number",
+      "default": -1.5708
+    },
+    "pwm_angle_max_rad": {
+      "label": "PWM Servo Angle Max (rad)",
+      "type": "number",
+      "default": 1.5708
+    },
+    "raw_min": {
+      "label": "Bus Servo Raw Min",
+      "type": "number",
+      "default": 0
+    },
+    "raw_max": {
+      "label": "Bus Servo Raw Max",
+      "type": "number",
+      "default": 1000
+    },
+    "bus_angle_min_rad": {
+      "label": "Bus Servo Angle Min (rad)",
+      "type": "number",
+      "default": -2.0944
+    },
+    "bus_angle_max_rad": {
+      "label": "Bus Servo Angle Max (rad)",
+      "type": "number",
+      "default": 2.0944
+    }
+  },
   "drivers": [
     {
       "name": "hiwonder_rrc_board",
@@ -11,29 +60,25 @@
           "label": "Serial Device",
           "description": "USB serial path for the RRC board.",
           "type": "string",
-          "default": "/dev/ttyACM0",
-          "scope": "instance"
+          "default": "/dev/ttyACM0"
         },
         "baud": {
           "label": "Baud Rate",
           "type": "number",
-          "default": 1000000,
-          "scope": "instance"
+          "default": 1000000
         },
         "poll_hz": {
           "label": "Queue Poll Rate (Hz)",
           "description": "Rate at which the adapter drains IMU/battery queues and republishes as PRP state.",
           "type": "number",
           "default": 100,
-          "min": 1,
-          "scope": "instance"
+          "min": 1
         },
         "battery_cells": {
           "label": "Battery Cell Count",
           "description": "Series cell count — used only to populate BatteryState.cell_voltage length.",
           "type": "number",
-          "default": 3,
-          "scope": "instance"
+          "default": 3
         }
       }
     },
@@ -49,37 +94,25 @@
           "type": "number",
           "min": 1,
           "max": 4,
-          "required": true,
-          "scope": "instance"
-        },
-        "gear_ratio": {
-          "label": "Gear Ratio",
-          "description": "Motor-shaft to output-shaft reduction (N:1). SPEED commands are in output rad/s.",
-          "type": "number",
-          "default": 1.0,
-          "min": 0.0001,
-          "scope": "part"
+          "required": true
         },
         "invert": {
           "label": "Invert Direction",
           "type": "boolean",
-          "default": false,
-          "scope": "instance"
+          "default": false
         },
         "state_hz": {
           "label": "State Publish Rate (Hz)",
           "description": "MotorState publish rate. RRC firmware does not report encoder ticks; measured_value echoes the commanded value.",
           "type": "number",
           "default": 10,
-          "min": 0,
-          "scope": "instance"
+          "min": 0
         },
         "debug_log": {
           "label": "Debug Log Writes",
           "description": "Log every speed/duty packet sent to the RRC board. Useful for diagnosing motor stop/start behaviour; noisy in steady-state teleop.",
           "type": "boolean",
-          "default": false,
-          "scope": "instance"
+          "default": false
         }
       }
     },
@@ -95,46 +128,19 @@
           "type": "number",
           "min": 1,
           "max": 4,
-          "required": true,
-          "scope": "instance"
-        },
-        "pulse_min_us": {
-          "label": "Pulse Min (µs)",
-          "type": "number",
-          "default": 500,
-          "scope": "part"
-        },
-        "pulse_max_us": {
-          "label": "Pulse Max (µs)",
-          "type": "number",
-          "default": 2500,
-          "scope": "part"
-        },
-        "angle_min_rad": {
-          "label": "Angle Min (rad)",
-          "type": "number",
-          "default": -1.5708,
-          "scope": "part"
-        },
-        "angle_max_rad": {
-          "label": "Angle Max (rad)",
-          "type": "number",
-          "default": 1.5708,
-          "scope": "part"
+          "required": true
         },
         "default_duration_ms": {
           "label": "Default Duration (ms)",
           "description": "Used when a ServoCommand has duration == 0.",
           "type": "number",
-          "default": 20,
-          "scope": "instance"
+          "default": 20
         },
         "state_hz": {
           "label": "State Publish Rate (Hz)",
           "type": "number",
           "default": 10,
-          "min": 0,
-          "scope": "instance"
+          "min": 0
         }
       }
     },
@@ -150,45 +156,18 @@
           "type": "number",
           "min": 1,
           "max": 253,
-          "required": true,
-          "scope": "instance"
-        },
-        "raw_min": {
-          "label": "Raw Min",
-          "type": "number",
-          "default": 0,
-          "scope": "part"
-        },
-        "raw_max": {
-          "label": "Raw Max",
-          "type": "number",
-          "default": 1000,
-          "scope": "part"
-        },
-        "angle_min_rad": {
-          "label": "Angle Min (rad)",
-          "type": "number",
-          "default": -2.0944,
-          "scope": "part"
-        },
-        "angle_max_rad": {
-          "label": "Angle Max (rad)",
-          "type": "number",
-          "default": 2.0944,
-          "scope": "part"
+          "required": true
         },
         "default_duration_ms": {
           "label": "Default Duration (ms)",
           "type": "number",
-          "default": 200,
-          "scope": "instance"
+          "default": 200
         },
         "state_hz": {
           "label": "State Publish Rate (Hz)",
           "type": "number",
           "default": 5,
-          "min": 0,
-          "scope": "instance"
+          "min": 0
         }
       }
     }

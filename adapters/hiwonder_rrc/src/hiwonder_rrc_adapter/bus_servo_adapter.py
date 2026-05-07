@@ -31,8 +31,8 @@ class HiwonderRRCBusServoAdapter(HardwareAdapter):
         self.servo_id = int(self.params["servo_id"])
         self.raw_min = int(self.params.get("raw_min", 0))
         self.raw_max = int(self.params.get("raw_max", 1000))
-        self.angle_min_rad = float(self.params.get("angle_min_rad", -2.0944))
-        self.angle_max_rad = float(self.params.get("angle_max_rad", 2.0944))
+        self.angle_min_rad = float(self.params.get("bus_angle_min_rad", -2.0944))
+        self.angle_max_rad = float(self.params.get("bus_angle_max_rad", 2.0944))
         self.default_duration_ms = int(self.params.get("default_duration_ms", 200))
         self.state_hz = float(self.params.get("state_hz", 5.0))
 

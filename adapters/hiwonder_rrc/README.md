@@ -44,16 +44,16 @@ hardware:
       channel: 1
       pulse_min_us: 500
       pulse_max_us: 2500
-      angle_min_rad: -1.5708
-      angle_max_rad:  1.5708
+      pwm_angle_min_rad: -1.5708
+      pwm_angle_max_rad:  1.5708
 
   - id: gripper
     driver: hiwonder_rrc_bus_servo
     params:
       board: rrc0
       servo_id: 5
-      angle_min_rad: -2.0944
-      angle_max_rad:  2.0944
+      bus_angle_min_rad: -2.0944
+      bus_angle_max_rad:  2.0944
 ```
 
 ## Limitations
