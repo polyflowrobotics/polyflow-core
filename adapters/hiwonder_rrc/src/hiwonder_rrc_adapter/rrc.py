@@ -38,7 +38,14 @@ class Func(enum.IntEnum):
 
 
 # --- Motor sub-commands ---
+# Documented in Hiwonder's official RRCLite protocol PDF:
+# 0x00 = set single motor speed, 0x01 = set multiple speeds,
+# 0x02 = stop single motor, 0x03 = stop motors via bitmask.
+# (0x05 = duty is from the unofficial fast-hiwonder SDK; not in the
+# official spec but the firmware accepts it.)
 MOTOR_SUB_SPEED = 0x01
+MOTOR_SUB_STOP_SINGLE = 0x02
+MOTOR_SUB_STOP_MASK = 0x03
 MOTOR_SUB_DUTY = 0x05
 
 # --- Protocol constants ---
@@ -337,9 +344,29 @@ class HiwonderRRC:
             data.extend(struct.pack("<Bf", motor_id - 1, float(duty)))
         self._send(Func.MOTOR, list(data))
 
+    def stop_motor(self, motor_id: int):
+        """
+        Stop a single motor via the documented protocol stop command.
+
+        Unlike set_motor_speed(0) — which the firmware treats as "no
+        command, hold last target" — this actually halts the motor.
+
+        Args:
+            motor_id: 1-indexed motor ID (1-4); converted to 0-indexed
+                      on the wire to match set_motor_speed.
+        """
+        self._send(Func.MOTOR, [MOTOR_SUB_STOP_SINGLE, motor_id - 1])
+
+    def stop_motors_mask(self, mask: int):
+        """
+        Stop multiple motors via bitmask. Bit 0 = motor 1, bit 1 = motor 2,
+        etc. e.g. mask=0b0101 stops motors 1 and 3.
+        """
+        self._send(Func.MOTOR, [MOTOR_SUB_STOP_MASK, mask & 0xFF])
+
     def stop_all_motors(self):
         """Stop all 4 motors."""
-        self.set_motor_speed([(1, 0.0), (2, 0.0), (3, 0.0), (4, 0.0)])
+        self.stop_motors_mask(0b1111)
 
     # --- PWM Servo commands ---
 
