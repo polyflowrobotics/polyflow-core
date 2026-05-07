@@ -60,6 +60,33 @@ def send(rrc, data, label):
     rrc._send(Func.MOTOR, list(data))
 
 
+def probe(rrc, func, payload, wait=0.3):
+    """Send a packet on `func` with `payload` and print whatever bytes come back.
+    Read-only style — does not write rrc state. Used to discover undocumented
+    sub-commands (e.g., a hidden 'get version' under SYS=0x00)."""
+    frame = predict_frame(func, payload)
+    print(f"  → {hexbytes(frame)}")
+    # Drain any stale bytes first
+    if rrc._serial.in_waiting:
+        stale = rrc._serial.read(rrc._serial.in_waiting)
+        print(f"  (drained {len(stale)} stale bytes)")
+    rrc._send(func, list(payload))
+    rrc._serial.flush()
+    deadline = time.monotonic() + wait
+    chunks = []
+    while time.monotonic() < deadline:
+        n = rrc._serial.in_waiting
+        if n:
+            chunks.append(rrc._serial.read(n))
+        else:
+            time.sleep(0.02)
+    resp = b"".join(chunks)
+    if resp:
+        print(f"  ← {hexbytes(resp)}")
+    else:
+        print(f"  ← (no response within {wait}s)")
+
+
 def speed_single(motor_byte, speed_rps):
     """Sub-cmd 0x00 — single-motor form. May be limited to one motor at a time."""
     return [SUB_SPEED_SINGLE, motor_byte] + list(struct.pack("<f", float(speed_rps)))
@@ -128,6 +155,11 @@ Deadband search — find the smallest target the firmware honors:
   v3) speed=+0.1
   v4) speed=+0.5
   v5) speed=+1.0
+
+Firmware probes (read-only — won't move the motor):
+  ?sys)  scan SYS func 0x00 sub-cmds 0x00..0x0F looking for a version reply
+  ?<HH SS>) send func 0xHH sub-cmd 0xSS once and print response
+            example: `?03 0A` probes MOTOR func with sub-cmd 0x0A
 
 Other:
   m N) switch to motor port N (1-4)
@@ -242,6 +274,21 @@ def main():
                          f"  loop tick speed={rate}")
                     time.sleep(0.2)
                 print("  loop done.")
+            elif choice == "?sys":
+                print("  scanning SYS (func=0x00) sub-cmds 0x00..0x0F:")
+                for sub in range(0x10):
+                    print(f"  -- sub-cmd 0x{sub:02X} --")
+                    probe(rrc, 0x00, [sub])
+            elif choice.startswith("?"):
+                # ?HH SS form
+                try:
+                    parts = choice[1:].strip().split()
+                    func = int(parts[0], 16)
+                    sub = int(parts[1], 16)
+                except (IndexError, ValueError):
+                    print("Usage: ?<HH> <SS>  (e.g. '?00 04' probes SYS battery)")
+                    continue
+                probe(rrc, func, [sub])
             elif choice in ("v1", "v2", "v3", "v4", "v5"):
                 target = {"v1": 0.01, "v2": 0.05, "v3": 0.1, "v4": 0.5, "v5": 1.0}[choice]
                 send(rrc, speed_multi([(our_idx, target)]),
