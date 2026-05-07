@@ -61,7 +61,10 @@ class HiwonderRRCMotorAdapter(HardwareAdapter):
             return
         self._rrc = rrc
 
-        self._write_active_stop()
+        # Ensure channel starts stopped. Use plain speed=0 (not active_stop)
+        # so the firmware's first observed mode is SPEED — sending duty=0 at
+        # boot can leave it stuck in DUTY mode and ignoring later SPEED packets.
+        self._write_speed_rps(0.0)
 
         if self.state_hz > 0:
             self._state_handle = self.schedule_poll(self.state_hz, self._publish_state)
