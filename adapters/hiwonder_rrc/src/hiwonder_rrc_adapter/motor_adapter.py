@@ -27,6 +27,9 @@ from .rrc import HiwonderRRC
 
 _TWO_PI = 2.0 * math.pi
 
+# Non-zero target used for "stop" — see _write_active_stop.
+_STOP_EPSILON = 1e-4
+
 
 class HiwonderRRCMotorAdapter(HardwareAdapter):
     driver_name = "hiwonder_rrc_motor"
@@ -138,14 +141,13 @@ class HiwonderRRCMotorAdapter(HardwareAdapter):
         self._rrc.set_motor_duty([(self.port, float(duty))])
 
     def _write_active_stop(self) -> None:
-        # RRC firmware treats set_motor_speed(0) as "no command, hold last
-        # PID target" — wheels coast indefinitely. set_motor_duty(0) shorts
-        # the H-bridge for an active brake. We send both so the PID setpoint
-        # is also reset for the next non-zero speed command.
+        # RRC firmware ignores set_motor_speed(0) entirely — "0" is treated
+        # as "no command, hold last target". But the PID *does* engage for
+        # any non-zero setpoint, so a vanishingly small target gets us
+        # active braking down to ~0 rps. 1e-4 rps = 0.036°/s, imperceptible.
         if self.debug_log:
             self.log(f"port={self.port} active_stop")
-        self._write_speed_rps(0.0)
-        self._write_duty_pct(0.0)
+        self._write_speed_rps(_STOP_EPSILON)
 
     def _safe_stop(self) -> None:
         try:
