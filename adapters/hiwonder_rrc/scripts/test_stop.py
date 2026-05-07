@@ -61,7 +61,18 @@ def send(rrc, data, label):
 
 
 def speed_single(motor_byte, speed_rps):
+    """Sub-cmd 0x00 — single-motor form. May be limited to one motor at a time."""
     return [SUB_SPEED_SINGLE, motor_byte] + list(struct.pack("<f", float(speed_rps)))
+
+
+def speed_multi(motors):
+    """Sub-cmd 0x01 — multi-motor form. This is what the production adapter uses
+    (with count=1). Pass a list of (motor_byte, speed_rps) tuples."""
+    data = [SUB_SPEED_MULTI, len(motors)]
+    for motor_byte, speed in motors:
+        data.append(motor_byte)
+        data.extend(struct.pack("<f", float(speed)))
+    return data
 
 
 def stop_single(motor_byte):
@@ -80,9 +91,13 @@ MENU = """
 ========= RRC Lite Motor Stop Tests =========
 Motor port: {motor}    (doc byte={doc_idx},  our byte={our_idx})
 
-Spin-up:
+Spin-up (sub-cmd 0x00, single-motor form — may have firmware quirks):
   1)  spin at +{spinup} r/s, doc-indexed (byte=0x{doc_idx:02X})
   2)  spin at +{spinup} r/s, our-indexed (byte=0x{our_idx:02X})
+
+Spin-up (sub-cmd 0x01, multi-motor form — what the production adapter uses):
+  3)  spin at +{spinup} r/s, doc-indexed
+  4)  spin at +{spinup} r/s, our-indexed
   r)  repeat last spin-up
 
 Stop variants — each sends ONE packet, watch the wheel:
@@ -157,10 +172,16 @@ def main():
 
             if choice == "1":
                 last_spinup = speed_single(doc_idx, spinup)
-                send(rrc, last_spinup, f"spin-up doc-indexed, +{spinup} r/s")
+                send(rrc, last_spinup, f"spin-up sub-cmd 0x00 doc-indexed, +{spinup} r/s")
             elif choice == "2":
                 last_spinup = speed_single(our_idx, spinup)
-                send(rrc, last_spinup, f"spin-up our-indexed, +{spinup} r/s")
+                send(rrc, last_spinup, f"spin-up sub-cmd 0x00 our-indexed, +{spinup} r/s")
+            elif choice == "3":
+                last_spinup = speed_multi([(doc_idx, spinup)])
+                send(rrc, last_spinup, f"spin-up sub-cmd 0x01 doc-indexed, +{spinup} r/s")
+            elif choice == "4":
+                last_spinup = speed_multi([(our_idx, spinup)])
+                send(rrc, last_spinup, f"spin-up sub-cmd 0x01 our-indexed, +{spinup} r/s")
             elif choice == "r":
                 if last_spinup is None:
                     print("No spin-up to repeat. Try [1] or [2] first.")
