@@ -33,14 +33,15 @@ Func = rrc_mod.Func
 _crc8 = rrc_mod._crc8
 
 
-# Sub-command bytes from the official RRCLite protocol PDF.
-SUB_SPEED_SINGLE = 0x00   # one motor, signed float r/s
-SUB_SPEED_MULTI  = 0x01   # N motors
+# Sub-command bytes from the 2026-05 RRC Lite "host-side motor protocol" spec.
+SUB_SPEED_SINGLE = 0x00   # one motor, signed float r/s (PID — needs working encoders)
+SUB_SPEED_MULTI  = 0x01   # N motors                    (PID — needs working encoders)
 SUB_STOP_SINGLE  = 0x02   # halt one motor
-SUB_STOP_MASK    = 0x03   # halt N motors (bit N of mask = motor N+1)
-SUB_DUTY         = 0x05   # NOT in official spec; came from fast-hiwonder
+SUB_STOP_MASK    = 0x03   # halt N motors (bit i = motor i)
+SUB_RAW_PWM      = 0x04   # one motor, signed i16 PWM (±1000) — open-loop
 
 SPINUP_RPS = 5.0
+SPINUP_PWM = 500          # 50% duty for raw-PWM spin-up
 
 
 def hexbytes(buf):
@@ -58,6 +59,67 @@ def send(rrc, data, label):
     print(f"  {label}")
     print(f"  → {hexbytes(predict_frame(Func.MOTOR, data))}")
     rrc._send(Func.MOTOR, list(data))
+
+
+def listen(rrc, seconds=10.0):
+    """Passively capture incoming frames for `seconds`. Parses anything that
+    starts with AA 55 as a protocol frame; everything else is shown as raw."""
+    print(f"  listening for {seconds}s — emit any input the board produces...")
+    deadline = time.monotonic() + seconds
+    buf = bytearray()
+    frames_seen = 0
+    raw_seen = 0
+
+    def try_parse_frame(b):
+        # b starts at AA. Returns (frame_bytes, consumed) or (None, 0) if incomplete
+        if len(b) < 5:
+            return None, 0
+        if b[0] != 0xAA or b[1] != 0x55:
+            return None, 1  # consume one byte, resync
+        func = b[2]
+        dlen = b[3]
+        total = 4 + dlen + 1
+        if len(b) < total:
+            return None, 0  # need more
+        data = bytes(b[4:4 + dlen])
+        crc_recv = b[4 + dlen]
+        crc_calc = _crc8(bytes([func, dlen]) + data)
+        ok = (crc_recv == crc_calc)
+        return (func, dlen, data, crc_recv, ok), total
+
+    try:
+        while time.monotonic() < deadline:
+            n = rrc._serial.in_waiting
+            if n:
+                buf.extend(rrc._serial.read(n))
+                # Try to parse as many frames as possible
+                while buf:
+                    parsed, consumed = try_parse_frame(buf)
+                    if parsed is None and consumed == 0:
+                        break  # need more bytes
+                    if parsed is None and consumed > 0:
+                        raw_seen += 1
+                        del buf[:consumed]
+                        continue
+                    func, dlen, data, crc_recv, ok = parsed
+                    frames_seen += 1
+                    func_name = {0:"SYS", 1:"LED", 2:"BUZZER", 3:"MOTOR", 4:"PWM_SERVO",
+                                 5:"BUS_SERVO", 6:"KEY", 7:"IMU", 8:"GAMEPAD",
+                                 9:"SBUS", 10:"OLED", 11:"RGB"}.get(func, f"?({func:#04x})")
+                    sub = data[0] if dlen >= 1 else None
+                    sub_str = f"sub=0x{sub:02X}" if sub is not None else ""
+                    crc_str = "OK" if ok else f"BAD (got 0x{crc_recv:02X})"
+                    print(f"  [{func_name:9s}] {sub_str:10s} dlen={dlen:3d}  "
+                          f"data={hexbytes(data) or '(none)'}  crc={crc_str}")
+                    del buf[:consumed]
+            else:
+                time.sleep(0.05)
+    except KeyboardInterrupt:
+        print("  (interrupted)")
+
+    print(f"  done. parsed {frames_seen} frames, {raw_seen} resync byte(s) discarded.")
+    if buf:
+        print(f"  trailing buffer ({len(buf)} bytes): {hexbytes(buf[:64])}")
 
 
 def probe(rrc, func, payload, wait=0.3):
@@ -110,8 +172,10 @@ def stop_mask(mask):
     return [SUB_STOP_MASK, mask & 0xFF]
 
 
-def duty_single(motor_byte, duty_pct):
-    return [SUB_DUTY, 1, motor_byte] + list(struct.pack("<f", float(duty_pct)))
+def pwm_single(motor_byte, pwm):
+    """Sub-cmd 0x04 — raw PWM, single motor. Payload: motor_id:u8, pwm:i16 LE."""
+    pwm = max(-1000, min(1000, int(pwm)))
+    return list(struct.pack("<BBh", SUB_RAW_PWM, motor_byte, pwm))
 
 
 MENU = """
@@ -134,7 +198,7 @@ Stop variants — each sends ONE packet, watch the wheel:
   d)  stop,     sub-cmd 0x02, our-indexed (byte=0x{our_idx:02X})
   e)  stop mask sub-cmd 0x03, mask=0x{mask_doc:02X}  (doc: bit {doc_bit} = motor {motor})
   f)  stop mask sub-cmd 0x03, mask=0x{mask_alt:02X}  (off-by-one alternative)
-  g)  duty=0,   sub-cmd 0x05  (undocumented)
+  g)  pwm=0,    sub-cmd 0x04 raw PWM (open-loop)
   j)  speed=0.0001, sub-cmd 0x00, doc-indexed (epsilon trick)
 
 Active brake (combo):
@@ -160,6 +224,9 @@ Firmware probes (read-only — won't move the motor):
   ?sys)  scan SYS func 0x00 sub-cmds 0x00..0x0F looking for a version reply
   ?<HH SS>) send func 0xHH sub-cmd 0xSS once and print response
             example: `?03 0A` probes MOTOR func with sub-cmd 0x0A
+  ?listen [SEC])  passively capture and parse all incoming frames for SEC
+                  seconds (default 10). Shows func/sub/data for every valid
+                  frame the firmware spontaneously emits.
 
 Other:
   m N) switch to motor port N (1-4)
@@ -171,7 +238,7 @@ Other:
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--port", default="/dev/ttyACM0")
-    p.add_argument("--baud", type=int, default=1_000_000)
+    p.add_argument("--baud", type=int, default=115_200)
     p.add_argument("--motor", type=int, default=1, choices=[1, 2, 3, 4])
     p.add_argument("--spinup", type=float, default=SPINUP_RPS,
                    help=f"spin-up speed in r/s (default {SPINUP_RPS})")
@@ -244,7 +311,7 @@ def main():
             elif choice == "f":
                 send(rrc, stop_mask(mask_alt), f"stop mask 0x{mask_alt:02X} (off-by-one)")
             elif choice == "g":
-                send(rrc, duty_single(doc_idx, 0.0), "duty=0, undocumented sub-cmd 0x05")
+                send(rrc, pwm_single(our_idx, 0), "pwm=0, sub-cmd 0x04 raw PWM (our-indexed)")
             elif choice == "j":
                 send(rrc, speed_single(doc_idx, 0.0001), "speed=0.0001 (epsilon)")
             elif choice == "h":
@@ -279,6 +346,10 @@ def main():
                 for sub in range(0x10):
                     print(f"  -- sub-cmd 0x{sub:02X} --")
                     probe(rrc, 0x00, [sub])
+            elif choice.startswith("?listen"):
+                parts = choice.split()
+                seconds = float(parts[1]) if len(parts) > 1 else 10.0
+                listen(rrc, seconds=seconds)
             elif choice.startswith("?"):
                 # ?HH SS form
                 try:

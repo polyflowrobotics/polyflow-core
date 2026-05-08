@@ -2,12 +2,14 @@
 Driver for Hiwonder RRC Lite board over USB serial.
 
 Speaks the RRC binary protocol: [0xAA, 0x55, func, data_len, ...data, crc8]
-Supports motor speed/duty control, buzzer, LEDs, RGB LEDs, and receiving
-IMU, battery, button, and servo feedback from the board.
+at 115200 baud, 8N1. Supports motor PID-speed and raw-PWM control, buzzer,
+LEDs, RGB LEDs, and receiving battery / motor-state / IMU / button / servo
+feedback from the board.
 
 Protocol references:
-  - github.com/dmberezovskyii/fast-hiwonder (send side)
-  - github.com/Matzefritz/HiWonder_MentorPi (receive side)
+  - Authoritative: RRC Lite "host-side motor protocol" spec (2026-05)
+  - github.com/dmberezovskyii/fast-hiwonder (older send side)
+  - github.com/Matzefritz/HiWonder_MentorPi (older receive side)
 """
 
 import enum
@@ -38,15 +40,21 @@ class Func(enum.IntEnum):
 
 
 # --- Motor sub-commands ---
-# Documented in Hiwonder's official RRCLite protocol PDF:
-# 0x00 = set single motor speed, 0x01 = set multiple speeds,
-# 0x02 = stop single motor, 0x03 = stop motors via bitmask.
-# (0x05 = duty is from the unofficial fast-hiwonder SDK; not in the
-# official spec but the firmware accepts it.)
-MOTOR_SUB_SPEED = 0x01
+# Per the 2026-05 RRC Lite "host-side motor protocol" spec:
+#   0x00 single speed (PID)   motor_id:u8, speed:f32 LE
+#   0x01 multi  speed (PID)   motor_num:u8, [motor_id:u8, speed:f32] × n
+#   0x02 stop single          motor_id:u8
+#   0x03 stop mask            motor_mask:u8  (bit i = motor i)
+#   0x04 single raw PWM       motor_id:u8, pwm:i16 LE  (range ±1000)
+# Sending 0x00/0x01 auto-disables raw mode; sending 0x04 auto-enables it.
+# Stops always clean up. The PID needs encoders to behave; with the
+# encoder hardware currently broken, raw PWM is the only predictable
+# open-loop path — speed setpoints saturate to full PWM.
+MOTOR_SUB_SPEED_SINGLE = 0x00
+MOTOR_SUB_SPEED_MULTI = 0x01
 MOTOR_SUB_STOP_SINGLE = 0x02
 MOTOR_SUB_STOP_MASK = 0x03
-MOTOR_SUB_DUTY = 0x05
+MOTOR_SUB_RAW_PWM = 0x04
 
 # --- Protocol constants ---
 MAGIC_1 = 0xAA
@@ -102,14 +110,15 @@ class HiwonderRRC:
 
     Args:
         port: Serial device path (default: /dev/ttyACM0).
-        baudrate: Baud rate (default: 1000000).
+        baudrate: Baud rate (default: 115200 — matches the firmware's
+                  USART1 wire speed via the on-board WCH USB bridge).
         timeout: Serial read timeout in seconds (default: 0.1).
     """
 
     def __init__(
         self,
         port: str = "/dev/ttyACM0",
-        baudrate: int = 1_000_000,
+        baudrate: int = 115_200,
         timeout: float = 0.1,
     ):
         self._port_path = port
@@ -136,10 +145,22 @@ class HiwonderRRC:
             Func.SBUS: queue.Queue(maxsize=4),
         }
 
+        # Latest motor-state telemetry (SYS sub_cmd 0x05, 20 Hz).
+        # Cached rather than queued because the frame interleaves all four
+        # motors and only the most recent reading is useful — and because
+        # the SYS queue is otherwise drained for battery messages.
+        # Tuple is (counters[4], rps[4], monotonic_ts) or None.
+        self._latest_motor_state: Optional[
+            Tuple[Tuple[int, int, int, int], Tuple[float, float, float, float], float]
+        ] = None
+
         # --- Optional user callbacks (called from rx thread) ---
         self.on_imu: Optional[Callable[[Tuple[float, ...]], None]] = None
         self.on_battery: Optional[Callable[[int], None]] = None
         self.on_key: Optional[Callable[[int, int], None]] = None
+        self.on_motor_state: Optional[
+            Callable[[Tuple[int, int, int, int], Tuple[float, float, float, float]], None]
+        ] = None
 
     # --- Connection lifecycle ---
 
@@ -243,29 +264,51 @@ class HiwonderRRC:
             return
         data = bytes(frame[2:])
 
-        # Enqueue for polling-style access
+        # SYS frames carry multiple sub-streams (battery at 1 Hz, motor state
+        # at 20 Hz). Route them by sub_cmd — motor-state lands in the cache,
+        # battery in the SYS queue. Otherwise the 20:1 motor-state-to-battery
+        # ratio would starve the queued battery polls.
+        if func == Func.SYS and len(data) >= 1:
+            sub = data[0]
+            if sub == 0x05 and len(data) >= 33:
+                vals = struct.unpack("<" + "if" * 4, data[1:33])
+                counters = (vals[0], vals[2], vals[4], vals[6])
+                rps = (vals[1], vals[3], vals[5], vals[7])
+                self._latest_motor_state = (counters, rps, time.monotonic())
+                if self.on_motor_state is not None:
+                    self.on_motor_state(counters, rps)
+                return
+            if sub == 0x04 and len(data) >= 3:
+                self._enqueue(func, data)
+                if self.on_battery is not None:
+                    self.on_battery(struct.unpack("<H", data[1:3])[0])
+                return
+            # Unknown SYS sub-cmd — drop silently.
+            return
+
+        # Non-SYS frames: enqueue for polling-style access, then fire callbacks.
+        self._enqueue(func, data)
+
+        if func == Func.IMU and self.on_imu is not None and len(data) >= 24:
+            self.on_imu(struct.unpack("<6f", data[:24]))
+        elif func == Func.KEY and self.on_key is not None and len(data) >= 2:
+            self.on_key(data[0], data[1])
+
+    def _enqueue(self, func: Func, data: bytes) -> None:
         q = self._queues.get(func)
-        if q is not None:
+        if q is None:
+            return
+        try:
+            q.put_nowait(data)
+        except queue.Full:
+            try:
+                q.get_nowait()  # drop oldest
+            except queue.Empty:
+                pass
             try:
                 q.put_nowait(data)
             except queue.Full:
-                try:
-                    q.get_nowait()  # drop oldest
-                except queue.Empty:
-                    pass
-                try:
-                    q.put_nowait(data)
-                except queue.Full:
-                    pass
-
-        # Fire callbacks
-        if func == Func.IMU and self.on_imu is not None and len(data) >= 24:
-            self.on_imu(struct.unpack("<6f", data[:24]))
-        elif func == Func.SYS and self.on_battery is not None and len(data) >= 3:
-            if data[0] == 0x04:
-                self.on_battery(struct.unpack("<H", data[1:3])[0])
-        elif func == Func.KEY and self.on_key is not None and len(data) >= 2:
-            self.on_key(data[0], data[1])
+                pass
 
     # --- Polling read methods ---
 
@@ -314,35 +357,63 @@ class HiwonderRRC:
             pass
         return None
 
+    def get_motor_state(self, motor_id: int) -> Optional[Tuple[int, float, float]]:
+        """
+        Read the latest cached motor-state telemetry for one motor (non-blocking).
+
+        Args:
+            motor_id: 1-indexed motor ID (1-4).
+
+        Returns:
+            (counter, rps, age_seconds) or None if no telemetry has arrived.
+            counter is an i32 encoder tick count; rps is rotations per second.
+            Both will read 0 until the encoder hardware is fixed.
+        """
+        latest = self._latest_motor_state
+        if latest is None:
+            return None
+        idx = motor_id - 1
+        if not 0 <= idx < 4:
+            return None
+        counters, rps, ts = latest
+        return (counters[idx], rps[idx], time.monotonic() - ts)
+
     # --- Motor commands ---
 
     def set_motor_speed(self, motors: List[Tuple[int, float]]):
         """
-        Set motor speeds (closed-loop PID control on the board).
+        Set motor speeds (closed-loop PID control on the board, sub-cmd 0x01).
+
+        ⚠ The board's PID needs encoder feedback, which is currently broken
+        on this hardware — any nonzero setpoint quickly saturates to full
+        PWM. Use `set_motor_pwm` for predictable open-loop control until
+        the encoder issue is resolved (firmware reflash). Sending this
+        also auto-disables raw-PWM mode on the firmware side.
 
         Args:
             motors: List of (motor_id, speed_rps) tuples.
                     motor_id is 1-indexed (1-4).
                     speed_rps is rotations per second.
         """
-        data = bytearray([MOTOR_SUB_SPEED, len(motors)])
+        data = bytearray([MOTOR_SUB_SPEED_MULTI, len(motors)])
         for motor_id, speed in motors:
             data.extend(struct.pack("<Bf", motor_id - 1, float(speed)))
         self._send(Func.MOTOR, list(data))
 
-    def set_motor_duty(self, motors: List[Tuple[int, float]]):
+    def set_motor_pwm(self, motor_id: int, pwm: int):
         """
-        Set motor duty cycles (open-loop PWM control).
+        Set raw PWM for one motor (open-loop, sub-cmd 0x04).
+
+        Auto-enables raw-PWM mode on the firmware side. Out-of-range values
+        are clamped to ±1000; the H-bridge clamps again at its own limit.
 
         Args:
-            motors: List of (motor_id, duty) tuples.
-                    motor_id is 1-indexed (1-4).
-                    duty is -100.0 to 100.0.
+            motor_id: 1-indexed motor ID (1-4).
+            pwm: PWM units in range ±1000 (positive = forward).
         """
-        data = bytearray([MOTOR_SUB_DUTY, len(motors)])
-        for motor_id, duty in motors:
-            data.extend(struct.pack("<Bf", motor_id - 1, float(duty)))
-        self._send(Func.MOTOR, list(data))
+        pwm_clamped = max(-1000, min(1000, int(pwm)))
+        payload = struct.pack("<BBh", MOTOR_SUB_RAW_PWM, motor_id - 1, pwm_clamped)
+        self._send(Func.MOTOR, list(payload))
 
     def stop_motor(self, motor_id: int):
         """

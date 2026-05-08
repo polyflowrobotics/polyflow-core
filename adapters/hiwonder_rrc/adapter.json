@@ -64,8 +64,9 @@
         },
         "baud": {
           "label": "Baud Rate",
+          "description": "RRC Lite firmware runs USART1 at 115200 baud over the on-board WCH USB bridge.",
           "type": "number",
-          "default": 1000000
+          "default": 115200
         },
         "poll_hz": {
           "label": "Queue Poll Rate (Hz)",
@@ -101,16 +102,23 @@
           "type": "boolean",
           "default": false
         },
+        "max_speed_rad_s": {
+          "label": "Max Speed (rad/s)",
+          "description": "Output-shaft rad/s that maps to full raw PWM (±1000). MOTOR_MODE_SPEED is currently routed through raw PWM open-loop because the firmware's PID needs encoder feedback that is broken on this hardware. Calibrate to the speed at which your motor saturates.",
+          "type": "number",
+          "default": 5.0,
+          "min": 0.0001
+        },
         "state_hz": {
           "label": "State Publish Rate (Hz)",
-          "description": "MotorState publish rate. RRC firmware does not report encoder ticks; measured_value echoes the commanded value.",
+          "description": "MotorState publish rate. measured_value is sourced from the firmware's 20 Hz motor-state telemetry (counter + rps); both read 0 until the encoder hardware is fixed.",
           "type": "number",
           "default": 10,
           "min": 0
         },
         "debug_log": {
           "label": "Debug Log Writes",
-          "description": "Log every speed/duty packet sent to the RRC board. Useful for diagnosing motor stop/start behaviour; noisy in steady-state teleop.",
+          "description": "Log every PWM/stop packet sent to the RRC board. Useful for diagnosing motor stop/start behaviour; noisy in steady-state teleop.",
           "type": "boolean",
           "default": false
         }
