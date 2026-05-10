@@ -35,7 +35,15 @@ class GamepadKernel(PolyflowKernel):
         poll_rate_hz:       How often to poll the device (default: 60).
         deadzone:           Axis deadzone threshold (default: 0.05).
         max_linear_speed:   Max linear speed in m/s (default: 1.0).
-        max_angular_speed:  Max angular rate in rad/s (default: 2.0).
+        max_angular_speed:  Max angular rate in rad/s (default: 2.0). Used only
+                            in "6dof" mode; in tank mode angular.z is derived
+                            from max_linear_speed and wheel_separation so the
+                            Twist round-trips cleanly through standard
+                            skid-steer kinematics.
+        wheel_separation:   Distance between left and right wheels in meters
+                            (default: 0.3). Used only in tank mode. Must match
+                            the diff-drive node's wheel_separation, otherwise
+                            pushing one stick will spin both sides.
         output_mode:        cmd_vel mapping: "diff_drive" (default) or "6dof".
                             "diff_drive" is tank-style: left stick Y drives the
                             left tread, right stick Y drives the right tread.
@@ -50,6 +58,7 @@ class GamepadKernel(PolyflowKernel):
         self.deadzone = float(self.get_param("deadzone", 0.05))
         self.max_linear_speed = float(self.get_param("max_linear_speed", 1.0))
         self.max_angular_speed = float(self.get_param("max_angular_speed", 2.0))
+        self.wheel_separation = float(self.get_param("wheel_separation", 0.3))
         self.output_mode = str(self.get_param("output_mode", "diff_drive"))
         self._connected = False
 
@@ -145,18 +154,24 @@ class GamepadKernel(PolyflowKernel):
             # Tank drive: left stick Y drives the left tread, right stick Y
             # drives the right tread. Browser stick Y is positive when pushed
             # down, so negate so stick-up = forward.
-            left_norm = -left_y
-            right_norm = -right_y
+            #
+            # Encode (left_v, right_v) into a Twist that inverts cleanly through
+            # standard skid-steer kinematics
+            # (left = lin - ang·s/2, right = lin + ang·s/2):
+            #   linear.x  = (left_v + right_v) / 2
+            #   angular.z = (right_v - left_v) / wheel_separation
+            left_v = -left_y * self.max_linear_speed
+            right_v = -right_y * self.max_linear_speed
             twist = {
                 "linear": {
-                    "x": (left_norm + right_norm) / 2.0 * self.max_linear_speed,
+                    "x": (left_v + right_v) / 2.0,
                     "y": 0.0,
                     "z": 0.0,
                 },
                 "angular": {
                     "x": 0.0,
                     "y": 0.0,
-                    "z": (right_norm - left_norm) / 2.0 * self.max_angular_speed,
+                    "z": (right_v - left_v) / self.wheel_separation,
                 },
             }
         self._maybe_emit("cmd_vel", twist, self._twist_changed)

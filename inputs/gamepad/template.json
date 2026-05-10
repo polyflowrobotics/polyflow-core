@@ -57,8 +57,16 @@
       "type": "number",
       "units": "rad/s",
       "default": 2.0,
-      "description": "Maximum turning rate for cmd_vel output.",
+      "description": "Maximum turning rate for cmd_vel output. Used only in 6dof mode; in diff_drive (tank) mode angular.z is derived from max_linear_speed and wheel_separation.",
       "ui": { "group": "Velocity", "order": 2 }
+    },
+    "wheel_separation": {
+      "label": "Wheel Separation",
+      "type": "number",
+      "units": "m",
+      "default": 0.3,
+      "description": "Distance between left and right wheels. Used only in diff_drive (tank) mode. Must match the Differential Drive node's wheel_separation.",
+      "ui": { "group": "Velocity", "order": 3 }
     },
     "output_mode": {
       "label": "cmd_vel Mapping",
@@ -66,7 +74,7 @@
       "default": "diff_drive",
       "allowed_values": ["diff_drive", "6dof"],
       "description": "diff_drive fills only linear.x + angular.z (for differential-drive bases). 6dof maps all four sticks plus shoulder/trigger buttons across the full Twist (for pose-controlled arms / IK).",
-      "ui": { "group": "Velocity", "order": 3 }
+      "ui": { "group": "Velocity", "order": 4 }
     }
   },
   "defaults": {
