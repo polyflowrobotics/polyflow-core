@@ -37,7 +37,9 @@ class GamepadKernel(PolyflowKernel):
         max_linear_speed:   Max linear speed in m/s (default: 1.0).
         max_angular_speed:  Max angular rate in rad/s (default: 2.0).
         output_mode:        cmd_vel mapping: "diff_drive" (default) or "6dof".
-                            "diff_drive" fills only linear.x + angular.z.
+                            "diff_drive" is tank-style: left stick Y drives the
+                            left tread, right stick Y drives the right tread.
+                            Fills only linear.x + angular.z.
                             "6dof" maps all four axes plus shoulder/trigger
                             buttons across the full Twist.
     """
@@ -140,13 +142,22 @@ class GamepadKernel(PolyflowKernel):
                 },
             }
         else:
-            # Single-stick skid steer: left stick Y drives forward/back, left
-            # stick X turns. ROS body-frame: +x forward, +z yaw CCW. Browser
-            # stick Y is positive when pushed down and X positive when pushed
-            # right, so both axes get negated.
+            # Tank drive: left stick Y drives the left tread, right stick Y
+            # drives the right tread. Browser stick Y is positive when pushed
+            # down, so negate so stick-up = forward.
+            left_norm = -left_y
+            right_norm = -right_y
             twist = {
-                "linear": {"x": -left_y * self.max_linear_speed, "y": 0.0, "z": 0.0},
-                "angular": {"x": 0.0, "y": 0.0, "z": -left_x * self.max_angular_speed},
+                "linear": {
+                    "x": (left_norm + right_norm) / 2.0 * self.max_linear_speed,
+                    "y": 0.0,
+                    "z": 0.0,
+                },
+                "angular": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": (right_norm - left_norm) / 2.0 * self.max_angular_speed,
+                },
             }
         self._maybe_emit("cmd_vel", twist, self._twist_changed)
 
