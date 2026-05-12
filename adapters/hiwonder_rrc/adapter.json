@@ -97,18 +97,6 @@
           "max": 4,
           "required": true
         },
-        "invert": {
-          "label": "Invert Direction",
-          "type": "boolean",
-          "default": false
-        },
-        "max_speed_rad_s": {
-          "label": "Max Speed (rad/s)",
-          "description": "Output-shaft rad/s that maps to full raw PWM (±1000). MOTOR_MODE_SPEED is currently routed through raw PWM open-loop because the firmware's PID needs encoder feedback that is broken on this hardware. Calibrate to the speed at which your motor saturates.",
-          "type": "number",
-          "default": 5.0,
-          "min": 0.0001
-        },
         "state_hz": {
           "label": "State Publish Rate (Hz)",
           "description": "MotorState publish rate. measured_value is sourced from the firmware's 20 Hz motor-state telemetry (counter + rps); both read 0 until the encoder hardware is fixed.",

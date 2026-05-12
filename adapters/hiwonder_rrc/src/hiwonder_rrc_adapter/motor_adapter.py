@@ -12,6 +12,12 @@ is at least predictable open-loop. SPEED uses `max_speed_rad_s` as the
 linear full-scale point. Once encoders are fixed, switch SPEED back to
 `set_motor_speed`.
 
+Direction inversion is handled upstream by the MotorController node
+(`reverse` parameter), so MotorCommand values arrive with the desired
+sign already applied. `max_speed_rad_s` is similarly fed in from the
+controlling node's `max_speed` parameter via hardware.json — it is not
+a user-editable adapter field.
+
 Motor-state telemetry (SYS sub-cmd 0x05, 20 Hz) is decoded by the driver
 and surfaced here as MotorState.measured_value. counter and rps will
 read 0 until the encoder hardware is fixed.
@@ -49,12 +55,14 @@ class HiwonderRRCMotorAdapter(HardwareAdapter):
     def configure(self) -> None:
         self.port = int(self.params["port"])
         self.gear_ratio = float(self.params.get("gear_ratio", 1.0))
-        self.invert = bool(self.params.get("invert", False))
         self.state_hz = float(self.params.get("state_hz", 10.0))
         self.debug_log = bool(self.params.get("debug_log", False))
         # SPEED rad/s at which raw PWM saturates to ±1000. Used to map
         # MOTOR_MODE_SPEED into open-loop PWM while the on-board PID is
-        # unusable (encoder feedback broken in current firmware).
+        # unusable (encoder feedback broken in current firmware). Sourced
+        # from the controlling MotorController node's `max_speed` parameter
+        # (serialized into hardware.json by the studio); defaults to 5.0
+        # rad/s when the studio hasn't injected a value yet.
         self.max_speed_rad_s = float(self.params.get("max_speed_rad_s", 5.0))
 
         self._rrc: Optional[HiwonderRRC] = None
@@ -107,12 +115,10 @@ class HiwonderRRCMotorAdapter(HardwareAdapter):
                 if value == 0.0:
                     self._write_active_stop()
                 else:
-                    pwm = self._rad_s_to_pwm(value)
-                    self._write_pwm(-pwm if self.invert else pwm)
+                    self._write_pwm(self._rad_s_to_pwm(value))
             elif mode == MOTOR_MODE_DUTY:
                 duty = max(-1.0, min(1.0, value))
-                pwm = int(round(duty * _PWM_FULL_SCALE))
-                self._write_pwm(-pwm if self.invert else pwm)
+                self._write_pwm(int(round(duty * _PWM_FULL_SCALE)))
             elif mode == MOTOR_MODE_IDLE:
                 self._write_active_stop()
                 value = 0.0
@@ -183,7 +189,7 @@ class HiwonderRRCMotorAdapter(HardwareAdapter):
         _counter, rps, _age = sample
         rad_s_motor = rps * _TWO_PI
         rad_s_output = rad_s_motor / self.gear_ratio if self.gear_ratio else rad_s_motor
-        return -rad_s_output if self.invert else rad_s_output
+        return rad_s_output
 
     def _publish_state(self) -> None:
         # Watchdog: if a timeout was set on the last command and it has elapsed, stop.
