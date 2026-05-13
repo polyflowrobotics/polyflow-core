@@ -8,6 +8,7 @@ from geometry_msgs.msg import Twist
 from polyflow_msgs.msg import GamepadAxes, GamepadButtons
 from common.polyflow_node import PolyflowNode
 from gamepad.kernel import GamepadKernel
+from gamepad.evdev_source import EvdevGamepadSource
 
 
 # Topic Studio publishes onto when relaying operator gamepad state over WebRTC.
@@ -24,7 +25,9 @@ class GamepadNode(PolyflowNode):
 
     Reads gamepad state from two parallel sources:
       - Studio relay over /prp/io/gamepad (operator driving remotely from the browser).
-      - Local hardware (USB/Bluetooth controller plugged into the robot).
+      - Local hardware via evdev (USB or Bluetooth-via-BlueZ controller on the
+        robot). BlueZ + the kernel HID layer expose paired BT pads at
+        /dev/input/event* identically to USB.
 
     On each tick at poll_rate_hz, whichever source most recently produced fresh
     data drives the kernel. If neither has produced fresh data within
@@ -51,10 +54,18 @@ class GamepadNode(PolyflowNode):
             10,
         )
 
+        self._hardware_source = EvdevGamepadSource(
+            device_index=self.kernel.device_index,
+            on_state=self._on_hardware_state,
+            logger=self.get_logger(),
+        )
+
         self.get_logger().info(
             f"Gamepad device={self.kernel.device_index} | poll_rate={self.kernel.poll_rate_hz}Hz | deadzone={self.kernel.deadzone}"
         )
         self.get_logger().info(f"Gamepad relay subscribed: {RELAY_TOPIC}")
+        if not EvdevGamepadSource.available():
+            self.get_logger().warn("python-evdev not installed; local gamepad input disabled")
 
     @staticmethod
     def _zero_state() -> dict:
@@ -81,17 +92,8 @@ class GamepadNode(PolyflowNode):
         }
         self._relay_state = (state, time.monotonic())
 
-    def _read_hardware(self) -> Optional[dict]:
-        """Sample the locally-attached gamepad and return the current state.
-
-        Return None when no controller is attached or no new sample is
-        available on this tick. Implementations can either poll synchronously
-        here or push samples into self._hardware_state from a background
-        coroutine — _select_source only cares about the timestamp.
-        """
-        # TODO: integrate with evdev / pygame.joystick / hidapi for the
-        # specific controller hardware on this robot.
-        return None
+    def _on_hardware_state(self, state: dict):
+        self._hardware_state = (state, time.monotonic())
 
     def _select_source(self) -> Tuple[dict, str]:
         now = time.monotonic()
@@ -117,29 +119,34 @@ class GamepadNode(PolyflowNode):
         self.kernel._connected = True
         self.get_logger().info("Gamepad ready")
 
+        hardware_task = asyncio.create_task(self._hardware_source.run())
+
         period = 1.0 / self.kernel.poll_rate_hz
         last_source: Optional[str] = None
 
-        while True:
-            if self.should_run():
-                hw_sample = self._read_hardware()
-                if hw_sample is not None:
-                    self._hardware_state = (hw_sample, time.monotonic())
+        try:
+            while True:
+                if self.should_run():
+                    state, source = self._select_source()
+                    if source != last_source:
+                        self.get_logger().info(f"Gamepad source: {source}")
+                        last_source = source
 
-                state, source = self._select_source()
-                if source != last_source:
-                    self.get_logger().info(f"Gamepad source: {source}")
-                    last_source = source
+                    self.kernel.emit_gamepad_state(
+                        left_x=state["left_x"],
+                        left_y=state["left_y"],
+                        right_x=state["right_x"],
+                        right_y=state["right_y"],
+                        buttons=state["buttons"],
+                    )
 
-                self.kernel.emit_gamepad_state(
-                    left_x=state["left_x"],
-                    left_y=state["left_y"],
-                    right_x=state["right_x"],
-                    right_y=state["right_y"],
-                    buttons=state["buttons"],
-                )
-
-            await asyncio.sleep(period)
+                await asyncio.sleep(period)
+        finally:
+            hardware_task.cancel()
+            try:
+                await hardware_task
+            except (asyncio.CancelledError, Exception):
+                pass
 
 
 def main(args=None):
