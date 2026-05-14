@@ -152,12 +152,20 @@ class PolyflowNode(Node):
 
     # --- Kernel callbacks ---
 
-    def _kernel_emit(self, pin_id: str, data: dict):
-        """Called by the kernel's emit(). Converts dict -> ROS msg and publishes."""
+    def _kernel_emit(self, pin_id: str, data):
+        """Called by the kernel's emit(). Converts dict/scalar -> ROS msg and publishes.
+
+        Kernels emitting to single-field primitive ROS types (Float64, Int32, Bool,
+        String, etc.) may emit a raw scalar — studio's in-browser sim consumes the
+        scalar directly, while here we wrap it into the msg's `data` field before
+        publishing.
+        """
         msg_type = self._output_pin_types.get(pin_id)
         if not msg_type:
             self.get_logger().debug(f"Kernel emitted on unregistered pin '{pin_id}'")
             return
+        if not isinstance(data, dict) and not hasattr(data, "get_fields_and_field_types"):
+            data = {"data": data}
         ros_msg = _dict_to_ros_msg(data, msg_type)
         self.publish_to_pin(pin_id, ros_msg)
 

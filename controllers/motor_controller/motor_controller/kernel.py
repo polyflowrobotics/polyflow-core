@@ -25,9 +25,8 @@ class MotorControllerKernel(PolyflowKernel):
     Input pins (as dicts):
         command — {"data": <float>}
 
-    Output pins (as dicts):
-        state — measured motor value as a scalar
-            {"data": <float>}
+    Output pins:
+        state — measured motor value as a raw float scalar
 
     Internal kernel→node channel (not a graph pin):
         hw_command — MotorCommand fields
@@ -80,11 +79,11 @@ class MotorControllerKernel(PolyflowKernel):
     def update_state(self, data: dict) -> None:
         """Called by the node when a MotorState message for this motor arrives.
 
-        Re-emits the measured value as a scalar on the graph "state" pin so
-        consumers (e.g. a studio chart widget) get a clean Float64 without
+        Re-emits the measured value as a raw float on the graph "state" pin so
+        consumers (e.g. a studio chart widget) get a clean scalar without
         hardware-bridge fields leaking into the graph.
         """
         if data.get("motor_id") and data.get("motor_id") != self.motor_id:
             return
 
-        self.emit("state", {"data": float(data.get("measured_value", 0.0) or 0.0)})
+        self.emit("state", float(data.get("measured_value", 0.0) or 0.0))
