@@ -14,7 +14,7 @@
     {
       "name": "state",
       "direction": "publish",
-      "msg_type": "polyflow_msgs/MotorState",
+      "msg_type": "std_msgs/Float64",
       "qos": {
         "reliability": "best_effort",
         "history": "keep_last",

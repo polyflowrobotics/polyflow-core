@@ -23,7 +23,7 @@ class MotorControllerNode(PolyflowNode):
         super().__init__()
 
         self.register_input_pin("command", Float64)
-        self.register_output_pin("state", MotorState)
+        self.register_output_pin("state", Float64)
 
         self._motor_cmd_publisher = self.create_publisher(
             MotorCommand, "/prp/hardware/cmd/motor_command", 10
