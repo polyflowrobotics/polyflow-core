@@ -12,9 +12,10 @@ class MotorControllerNode(PolyflowNode):
     """
     ROS wrapper for MotorControllerKernel.
 
-    Converts the kernel's hw_motor_command dicts into typed MotorCommand
-    messages and publishes them on the PRP hardware command topic for the
-    polyflow-os daemon to route to the appropriate board driver.
+    Intercepts the kernel's "hw_command" emission, types it up as a
+    MotorCommand, and publishes it on the PRP hardware command topic.
+    Subscribes to the matching PRP MotorState topic and forwards feedback
+    into the kernel, which re-emits a scalar on the graph "state" pin.
     """
 
     kernel_class = MotorControllerKernel
@@ -47,7 +48,7 @@ class MotorControllerNode(PolyflowNode):
 
         original_emit = self.kernel.on_emit
         def on_kernel_emit(pin_id, data):
-            if pin_id == "hw_motor_command":
+            if pin_id == "hw_command":
                 self._publish_motor_command(data)
             elif original_emit:
                 original_emit(pin_id, data)
@@ -58,11 +59,11 @@ class MotorControllerNode(PolyflowNode):
             f"| mode={self.kernel.mode} | max_speed={self.kernel.max_speed}"
         )
 
-    def _publish_motor_command(self, data: dict):
+    def _publish_motor_command(self, data: dict) -> None:
         msg = _dict_to_ros_msg(data, MotorCommand)
         msg.stamp = self.get_clock().now().to_msg()
         self._motor_cmd_publisher.publish(msg)
-        self._trace_pin("OUT", "hw_motor_command", msg)
+        self._trace_pin("OUT", "hw_command", msg)
 
     def _on_prp_motor_state(self, msg: MotorState) -> None:
         """Forward hardware feedback to the kernel (which re-emits on the graph state pin)."""
