@@ -6,7 +6,10 @@
     {
       "name": "command",
       "direction": "subscribe",
-      "msg_type": "std_msgs/Float64"
+      "msg_type": "std_msgs/Float64",
+      "studio_role": {
+        "widget": "slider"
+      }
     }
   ],
   "services": [],

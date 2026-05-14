@@ -6,7 +6,11 @@
     {
       "name": "target_pose",
       "direction": "subscribe",
-      "msg_type": "geometry_msgs/Pose"
+      "msg_type": "geometry_msgs/Pose",
+      "studio_role": {
+        "widget": "ik_gizmo",
+        "source": "scene"
+      }
     },
     {
       "name": "joint_states",
@@ -21,7 +25,10 @@
     {
       "name": "current_pose",
       "direction": "publish",
-      "msg_type": "geometry_msgs/Pose"
+      "msg_type": "geometry_msgs/Pose",
+      "studio_role": {
+        "widget": "pose_overlay"
+      }
     }
   ],
   "services": [],

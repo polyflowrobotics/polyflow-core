@@ -11,7 +11,10 @@
     {
       "name": "encoder_state",
       "direction": "publish",
-      "msg_type": "polyflow_msgs/EncoderState"
+      "msg_type": "polyflow_msgs/EncoderState",
+      "studio_role": {
+        "widget": "encoder"
+      }
     }
   ],
   "services": [],

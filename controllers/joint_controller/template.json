@@ -11,13 +11,19 @@
         "reliability": "reliable",
         "history": "keep_last",
         "depth": 10
+      },
+      "studio_role": {
+        "widget": "trajectory"
       }
     },
     {
       "name": "mode",
       "direction": "subscribe",
       "msg_type": "std_msgs/String",
-      "allowed_values": ["position", "velocity", "torque"]
+      "allowed_values": ["position", "velocity", "torque"],
+      "studio_role": {
+        "widget": "string"
+      }
     },
     {
       "name": "state",
@@ -27,6 +33,9 @@
         "reliability": "best_effort",
         "history": "keep_last",
         "depth": 10
+      },
+      "studio_role": {
+        "widget": "joint_state"
       }
     }
   ],

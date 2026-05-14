@@ -1,0 +1,42 @@
+{
+  "type": "sensor",
+  "name": "Battery Monitor",
+  "entry_point": "battery_monitor/node.py",
+  "topics": [
+    {
+      "name": "battery_state",
+      "direction": "publish",
+      "msg_type": "sensor_msgs/BatteryState",
+      "qos": {
+        "reliability": "best_effort",
+        "history": "keep_last",
+        "depth": 10
+      },
+      "studio_role": {
+        "widget": "battery"
+      }
+    }
+  ],
+  "services": [],
+  "actions": [],
+  "parameters_schema": {
+    "target_id": {
+      "label": "Target ID Filter",
+      "type": "string",
+      "default": "",
+      "description": "Optional. Leave blank to mirror every BatteryState source on the bus. Set to a specific adapter target (e.g. \"rrc0\", \"main_battery\") to restrict the node to a single source. Each message's header.frame_id identifies its origin.",
+      "ui": { "group": "Source", "order": 1 }
+    },
+    "discovery_period_s": {
+      "label": "Discovery Period",
+      "type": "number",
+      "units": "s",
+      "default": 2.0,
+      "description": "How often to rescan the bus for new BatteryState topics.",
+      "ui": { "group": "Source", "order": 2 }
+    }
+  },
+  "defaults": {
+    "rate_hz": 1
+  }
+}

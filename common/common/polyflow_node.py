@@ -71,9 +71,14 @@ class PolyflowNode(Node):
     (self.kernel). Subclasses should set kernel_class to provide their own
     kernel, or override process_input directly for ROS-specific behaviour.
 
-    Topic convention: /prp/graph/{node_id}/{pin_id}
+    Topic convention:
+        /prp/nodes/{node_id}/outputs/{pin_id}  — produced by this node
+        /prp/nodes/{node_id}/inputs/{pin_id}   — consumed by this node (graph
+                                                  wiring + Studio injection)
+
     Each output pin publishes on its own typed topic. Each input pin subscribes
-    to the source node's output topic as defined in POLYFLOW_INBOUND_CONNECTIONS.
+    to the source node's output topic as defined in POLYFLOW_INBOUND_CONNECTIONS,
+    plus a direct-injection topic on its own /inputs/ path for external clients.
     """
 
     kernel_class: type = PolyflowKernel
@@ -164,14 +169,15 @@ class PolyflowNode(Node):
 
     def register_output_pin(self, pin_id: str, msg_type: type, queue_size: int = 10):
         """
-        Register a typed output pin. Creates a ROS publisher on /prp/graph/{node_id}/{pin_id}.
+        Register a typed output pin. Creates a ROS publisher on
+        /prp/nodes/{node_id}/outputs/{pin_id}.
 
         Args:
             pin_id: The output pin identifier.
             msg_type: The ROS message type to publish.
             queue_size: Publisher queue depth (default: 10).
         """
-        topic = f"/prp/graph/{self.ros_safe_id}/{pin_id}"
+        topic = f"/prp/nodes/{self.ros_safe_id}/outputs/{pin_id}"
         self._pin_publishers[pin_id] = self.create_publisher(msg_type, topic, queue_size)
         self._output_pin_types[pin_id] = msg_type
         self.get_logger().info(f"Output pin '{pin_id}' -> {topic} [{msg_type.__name__}]")
@@ -202,7 +208,7 @@ class PolyflowNode(Node):
                 safe_source_id = source_node_id.replace('-', '_')
                 if safe_source_id[0].isdigit():
                     safe_source_id = f"n{safe_source_id}"
-                topic = f"/prp/graph/{safe_source_id}/{source_pin_id}"
+                topic = f"/prp/nodes/{safe_source_id}/outputs/{source_pin_id}"
 
                 sub = self.create_subscription(
                     msg_type,
