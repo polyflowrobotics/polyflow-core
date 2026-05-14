@@ -3,34 +3,15 @@ revision = 3
 requires-python = ">=3.12"
 
 [[package]]
-name = "evdev-binary"
-version = "1.9.3"
-source = { registry = "https://pypi.org/simple" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/1e/30/645606224343ecc02599b731a9090180519b84276c7331bb7805aeb907a5/evdev_binary-1.9.3-cp312-cp312-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl", hash = "sha256:53bda21275627cc28008bd94dc1ba324c3c24debd0a4b779a64242f19697d681", size = 111362, upload-time = "2026-02-05T21:59:25.167Z" },
-    { url = "https://files.pythonhosted.org/packages/cf/63/b9bb5d2fdf836581821f2ebce82b8b35ec8718482e8f78ec1733ed97fd9b/evdev_binary-1.9.3-cp312-cp312-musllinux_1_2_x86_64.whl", hash = "sha256:4404fc4222c9c6670b91ab07784b9d0ed06b6138079f91216d0e9238fcd89df3", size = 112497, upload-time = "2026-02-05T21:59:26.424Z" },
-    { url = "https://files.pythonhosted.org/packages/9d/36/c109d26825e66847721e004708ee4c4b46b2b2c4a22a5b84e40fed051336/evdev_binary-1.9.3-cp313-cp313-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl", hash = "sha256:ef92f0259d3bd1d9b449a4ea1ff7b747064a98c4c55844e3f1cbe880c2efe25c", size = 111512, upload-time = "2026-02-05T21:59:27.538Z" },
-    { url = "https://files.pythonhosted.org/packages/08/c3/3c4a5e2ca1a07c15db1afa48acf090ec906464bb428fb6b930a4028ca7bf/evdev_binary-1.9.3-cp313-cp313-musllinux_1_2_x86_64.whl", hash = "sha256:1eb0166c89d96dfe56187b18155323f655bdfdf2695777df29b33c44e48ffc74", size = 112661, upload-time = "2026-02-05T21:59:28.727Z" },
-    { url = "https://files.pythonhosted.org/packages/65/8a/007452c2ffef67d63d02227aba6628704ebd50733ddbdb5af749626a0f1b/evdev_binary-1.9.3-cp314-cp314-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl", hash = "sha256:6c2d609562c8ceb51b10ed08f2d0a2bc910fa77343c6df0a197fe6360202e039", size = 111613, upload-time = "2026-02-05T21:59:30.367Z" },
-    { url = "https://files.pythonhosted.org/packages/8a/0b/05d33bc292583404dbe5af594602678f6091073ad6050d00b27acfae4f5a/evdev_binary-1.9.3-cp314-cp314-musllinux_1_2_x86_64.whl", hash = "sha256:25dc29c2b1a771c11b2f12a45ae6f2f6895a6e12f75b1ef37dc0c24355d25293", size = 112749, upload-time = "2026-02-05T21:59:32.038Z" },
-    { url = "https://files.pythonhosted.org/packages/6e/d5/1602e0f0aebd2668abb9605f42d64258bfdc3cdb9aeed0fe428abba5cc1a/evdev_binary-1.9.3-cp314-cp314t-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl", hash = "sha256:910b24cc6f921b7e134b2d7ab30cf0d1123e2cc2fbef0a94c0f7fbcd911c818c", size = 114349, upload-time = "2026-02-05T21:59:33.146Z" },
-    { url = "https://files.pythonhosted.org/packages/2f/78/f423d6444ab9b23703f053b022689e011bc2b4dafd9d3bb8d93a23db927b/evdev_binary-1.9.3-cp314-cp314t-musllinux_1_2_x86_64.whl", hash = "sha256:f0487ab54cfcb1972d891249b3874fe1dbbef93bbb9c14def823b89533fbf976", size = 115287, upload-time = "2026-02-05T21:59:34.801Z" },
-]
-
-[[package]]
 name = "gamepad"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
-    { name = "evdev-binary" },
     { name = "setuptools" },
 ]
 
 [package.metadata]
-requires-dist = [
-    { name = "evdev-binary" },
-    { name = "setuptools" },
-]
+requires-dist = [{ name = "setuptools" }]
 
 [[package]]
 name = "setuptools"

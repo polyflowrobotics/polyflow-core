@@ -65,7 +65,7 @@ class GamepadNode(PolyflowNode):
         )
         self.get_logger().info(f"Gamepad relay subscribed: {RELAY_TOPIC}")
         if not EvdevGamepadSource.available():
-            self.get_logger().warn("python-evdev not installed; local gamepad input disabled")
+            self.get_logger().warn("/dev/input not present; local gamepad input disabled")
 
     @staticmethod
     def _zero_state() -> dict:
