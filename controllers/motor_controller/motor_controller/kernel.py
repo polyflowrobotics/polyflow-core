@@ -28,6 +28,8 @@ class MotorControllerKernel(PolyflowKernel):
     Output pins (as dicts):
         hw_motor_command — MotorCommand fields
             {motor_id, mode, value, timeout_s}
+        state            — MotorState fields
+            {motor_id, mode, commanded_value, measured_value, current, connected}
 
     Parameters:
         motor_id:   User-defined string ID (e.g., "left_drive").
@@ -71,4 +73,22 @@ class MotorControllerKernel(PolyflowKernel):
             "mode": self.mode,
             "value": self._current_value,
             "timeout_s": self.timeout_s,
+        })
+
+    def update_state(self, data: dict) -> None:
+        """Called by the node when a MotorState message for this motor arrives.
+
+        Re-emits the feedback on the graph "state" pin so consumers (e.g.
+        a studio chart widget) can subscribe directly to the node output.
+        """
+        if data.get("motor_id") and data.get("motor_id") != self.motor_id:
+            return
+
+        self.emit("state", {
+            "motor_id": self.motor_id,
+            "mode": int(data.get("mode", self.mode) or 0),
+            "commanded_value": float(data.get("commanded_value", 0.0) or 0.0),
+            "measured_value": float(data.get("measured_value", 0.0) or 0.0),
+            "current": float(data.get("current", 0.0) or 0.0),
+            "connected": bool(data.get("connected", False)),
         })

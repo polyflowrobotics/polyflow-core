@@ -10,6 +10,19 @@
       "studio_role": {
         "widget": "slider"
       }
+    },
+    {
+      "name": "state",
+      "direction": "publish",
+      "msg_type": "polyflow_msgs/MotorState",
+      "qos": {
+        "reliability": "best_effort",
+        "history": "keep_last",
+        "depth": 10
+      },
+      "studio_role": {
+        "widget": "chart"
+      }
     }
   ],
   "services": [],
