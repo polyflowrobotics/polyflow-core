@@ -76,6 +76,12 @@ class MotorControllerKernel(PolyflowKernel):
             "timeout_s": self.timeout_s,
         })
 
+    # Suppress noise around zero. Physics-sim drift and real encoder
+    # quantization both produce sub-threshold values when the motor is
+    # commanded to stop — pinning those to 0 makes charts and downstream
+    # consumers see a clean rest state.
+    _STATE_DEADBAND = 0.05
+
     def update_state(self, data: dict) -> None:
         """Called by the node when a MotorState message for this motor arrives.
 
@@ -86,4 +92,7 @@ class MotorControllerKernel(PolyflowKernel):
         if data.get("motor_id") and data.get("motor_id") != self.motor_id:
             return
 
-        self.emit("state", float(data.get("measured_value", 0.0) or 0.0))
+        value = float(data.get("measured_value", 0.0) or 0.0)
+        if abs(value) < self._STATE_DEADBAND:
+            value = 0.0
+        self.emit("state", value)
