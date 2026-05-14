@@ -9,7 +9,7 @@ authors = [
 maintainers = [
     {name = "Drew Swinney", email = "drew@polyflowrobotics.com"},
 ]
-dependencies = ["setuptools", "evdev"]
+dependencies = ["setuptools", "evdev-binary"]
 
 [tool.setuptools.packages.find]
 where = ["."]
