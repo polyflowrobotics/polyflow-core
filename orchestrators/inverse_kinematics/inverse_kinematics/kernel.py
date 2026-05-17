@@ -73,6 +73,15 @@ class InverseKinematicsKernel(PolyflowKernel):
         self._num_joints = len(self._chain)
         self._current_joint_positions: Optional[List[float]] = None
 
+        # Cache of the last target we actually solved for. Upstream nodes
+        # (notably twist_to_pose) re-emit target_pose every tick to keep
+        # downstream "warm"; without this dedup we'd run least_squares 50
+        # times per second on an unchanging target, and tiny variations in
+        # the seed (from joint_states feedback drift) would push the solver
+        # to different branches each tick — visible as joints flailing.
+        self._last_solved_target: Optional[np.ndarray] = None
+        self._target_dedup_tol_m: float = 1e-4  # 0.1 mm
+
         # Map joint IDs to chain indices for fan-in state accumulation
         self._joint_name_to_idx: Dict[str, int] = {}
         for i, joint in enumerate(self._chain):
@@ -359,6 +368,12 @@ class InverseKinematicsKernel(PolyflowKernel):
             pos = data.get("position", {})
             target_pos = np.array([pos.get("x", 0), pos.get("y", 0), pos.get("z", 0)])
 
+            # Skip the solve when the target hasn't moved beyond our tolerance.
+            # Avoids re-solving on every tick of an upstream "keep-warm" emitter.
+            if self._last_solved_target is not None:
+                if np.linalg.norm(target_pos - self._last_solved_target) < self._target_dedup_tol_m:
+                    return
+
             # Debug logging
             q_current = np.array(self._current_joint_positions, dtype=float)
             ee = self._ee_position(q_current)
@@ -367,6 +382,7 @@ class InverseKinematicsKernel(PolyflowKernel):
             self.log(f"Current q (rad): {[f'{a:.4f}' for a in self._current_joint_positions]}")
 
             solution = self._solve_ik(target_pos, self._current_joint_positions)
+            self._last_solved_target = target_pos.copy()
 
             # Verify
             sol_ee = self._ee_position(np.array(solution))
