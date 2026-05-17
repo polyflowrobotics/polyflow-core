@@ -138,7 +138,7 @@ class InverseKinematicsKernel(PolyflowKernel):
             output_t = np.array([origin.get("x", 0), origin.get("y", 0), origin.get("z", 0)], dtype=float)
             output_r = _euler_to_rotation(origin.get("rx", 0), origin.get("ry", 0), origin.get("rz", 0))
 
-            # Child input origin — look up from component data (in mm → meters).
+            # Child input origin — already in meters from logic worker.
             # Post-refactor components use a unified `io` array with direction markers
             # instead of separate `inputs`/`outputs`.
             child_id = joint.get("child", "")
@@ -156,7 +156,7 @@ class InverseKinematicsKernel(PolyflowKernel):
                     if direction and direction != "input":
                         continue
                     io = inp.get("origin", {})
-                    input_t = np.array([io.get("x", 0), io.get("y", 0), io.get("z", 0)], dtype=float) / 1000.0
+                    input_t = np.array([io.get("x", 0), io.get("y", 0), io.get("z", 0)], dtype=float)
                     input_r = _euler_to_rotation(io.get("rx", 0), io.get("ry", 0), io.get("rz", 0))
                     # Input connector axis (faces opposite to output axis)
                     ia = inp.get("axis", None)
@@ -175,15 +175,15 @@ class InverseKinematicsKernel(PolyflowKernel):
                 axis = np.array([0, 0, 1], dtype=float)
             axis = axis / np.linalg.norm(axis)
 
-            # Joint limits (degrees → radians)
+            # Joint limits (radians, SI from logic worker)
             limit = joint.get("limit", {})
             lower_raw = limit.get("lower_position", limit.get("lower", None))
             upper_raw = limit.get("upper_position", limit.get("upper", None))
             if joint_type == "continuous" or (lower_raw is None and upper_raw is None):
                 lower, upper = -math.inf, math.inf
             else:
-                lower = math.radians(lower_raw) if lower_raw is not None else -math.pi
-                upper = math.radians(upper_raw) if upper_raw is not None else math.pi
+                lower = float(lower_raw) if lower_raw is not None else -math.pi
+                upper = float(upper_raw) if upper_raw is not None else math.pi
 
             # Pre-compute parent and child pose transforms
             # Parent frame: R_output * alignXTo(outputAxis)
