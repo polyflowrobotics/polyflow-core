@@ -196,7 +196,13 @@ class InverseKinematicsKernel(PolyflowKernel):
             T_child_pose = _homogeneous(input_r @ R_align_child, input_t)
             T_child_pose_inv = np.linalg.inv(T_child_pose)
 
-            joint_id = joint.get("_id", joint.get("parent_output", ""))
+            # Joint identity in the rest of the system (joint_controller.joint_id,
+            # NodePinControl, hardware.yaml, outputToJointIdx) is the parent_output
+            # IO _id, not the joint document _id. Prefer parent_output so that the
+            # joint_commands we emit match what joint_controller listens for, and
+            # so feedback on `joint_states` (which arrives keyed by IO _id) can
+            # find its way back into _current_joint_positions.
+            joint_id = joint.get("parent_output") or joint.get("_id", "")
             chain.append({
                 "_id": joint_id,
                 "name": joint.get("name", child_comp.get("name", "unnamed")),
