@@ -214,6 +214,12 @@ class InverseKinematicsKernel(PolyflowKernel):
             joint_id = joint.get("parent_output") or joint.get("_id", "")
             chain.append({
                 "_id": joint_id,
+                # Joint document _id — needed to map into config.jointOrder
+                # (which is built from j._id, not parent_output).
+                "_doc_id": joint.get("_id", ""),
+                # Child component _id — needed to map into config.componentOrder
+                # for per-link FK comparison against PhysX world poses.
+                "_child_component_id": child_id,
                 "name": joint.get("name", child_comp.get("name", "unnamed")),
                 "type": joint_type,
                 "axis": axis,
@@ -300,6 +306,34 @@ class InverseKinematicsKernel(PolyflowKernel):
         q = np.array(list(joint_angles), dtype=float)
         p = self._ee_position(q)
         return [float(p[0]), float(p[1]), float(p[2])]
+
+    def get_chain_info(self) -> Dict[str, Any]:
+        """Chain metadata for external FK comparison.
+
+        - joint_doc_ids[i] = the joint's MongoDB _id, matches config.jointOrder
+          (used to look up joint angles in the joint SAB).
+        - joint_ids[i] = parent_output IO _id, matches NodePinControl /
+          hardware.yaml (the same value the kernel emits as joint_commands.name).
+        - body_component_ids[i] = component owning transforms[i] from
+          _forward_kinematics, matches config.componentOrder (used to look up
+          world poses in the frame SAB).
+        """
+        return {
+            "root_component_id": self.root_component_id,
+            "joint_doc_ids": [j["_doc_id"] for j in self._chain],
+            "joint_ids": [j["_id"] for j in self._chain],
+            "body_component_ids": [self.root_component_id] + [
+                j["_child_component_id"] for j in self._chain
+            ],
+        }
+
+    def get_body_positions(self, joint_angles) -> List[List[float]]:
+        """Per-link FK at joint_angles. Returns [[x,y,z], ...] in chain order
+        (body 0 = root, body i = chain[i-1]._child_component_id). Used for the
+        FK-comparison diagnostic against PhysX's per-link world poses."""
+        q = np.array(list(joint_angles), dtype=float)
+        fk = self._forward_kinematics(q)
+        return [[float(T[0, 3]), float(T[1, 3]), float(T[2, 3])] for T in fk]
 
     def _solve_ik(self, target_pos: np.ndarray, current: List[float]) -> List[float]:
         """IK solver using scipy.optimize.least_squares with regularization.
