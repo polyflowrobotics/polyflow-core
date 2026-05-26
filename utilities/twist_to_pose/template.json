@@ -6,22 +6,26 @@
     {
       "name": "cmd_vel",
       "direction": "subscribe",
-      "msg_type": "geometry_msgs/Twist"
+      "msg_type": "geometry_msgs/Twist",
+      "description": "Velocity command to integrate into the running pose. Interpreted in either the body or world frame based on the frame parameter."
     },
     {
       "name": "seed_pose",
       "direction": "subscribe",
-      "msg_type": "geometry_msgs/Pose"
+      "msg_type": "geometry_msgs/Pose",
+      "description": "Anchor pose. The integrator snaps to this on first receipt and on every disable→enable transition so re-enabling starts cleanly."
     },
     {
       "name": "enable",
       "direction": "subscribe",
-      "msg_type": "std_msgs/Bool"
+      "msg_type": "std_msgs/Bool",
+      "description": "Deadman input. When require_enable=true, velocity is treated as zero while this is false."
     },
     {
       "name": "target_pose",
       "direction": "publish",
-      "msg_type": "geometry_msgs/Pose"
+      "msg_type": "geometry_msgs/Pose",
+      "description": "Pose produced by integrating cmd_vel since the last seed/snap. Clamped to the optional workspace bounds."
     }
   ],
   "services": [],

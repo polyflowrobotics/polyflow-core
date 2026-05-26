@@ -6,12 +6,14 @@
     {
       "name": "buttons",
       "direction": "subscribe",
-      "msg_type": "polyflow_msgs/GamepadButtons"
+      "msg_type": "polyflow_msgs/GamepadButtons",
+      "description": "Incoming gamepad button state. The selected button is extracted and forwarded as a Bool."
     },
     {
       "name": "value",
       "direction": "publish",
-      "msg_type": "std_msgs/Bool"
+      "msg_type": "std_msgs/Bool",
+      "description": "Boolean reflecting the selected button's pressed state (optionally inverted). With emit_only_on_change, fires only on edges."
     }
   ],
   "services": [],

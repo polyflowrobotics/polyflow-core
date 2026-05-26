@@ -7,6 +7,7 @@
       "name": "command",
       "direction": "subscribe",
       "msg_type": "std_msgs/Float64",
+      "description": "Motor setpoint. Interpreted as rad/s in speed mode or as a normalized [-1, 1] duty in duty mode. Negated when Reverse is enabled.",
       "studio_role": {
         "widget": "slider"
       }
@@ -15,6 +16,7 @@
       "name": "state",
       "direction": "publish",
       "msg_type": "std_msgs/Float64",
+      "description": "Most recent feedback from the driver — rad/s in speed mode, duty in duty mode.",
       "qos": {
         "reliability": "best_effort",
         "history": "keep_last",

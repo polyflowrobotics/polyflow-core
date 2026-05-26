@@ -6,17 +6,20 @@
     {
       "name": "axes",
       "direction": "publish",
-      "msg_type": "polyflow_msgs/GamepadAxes"
+      "msg_type": "polyflow_msgs/GamepadAxes",
+      "description": "Current normalized stick and trigger positions from the selected gamepad, after the deadzone is applied."
     },
     {
       "name": "buttons",
       "direction": "publish",
-      "msg_type": "polyflow_msgs/GamepadButtons"
+      "msg_type": "polyflow_msgs/GamepadButtons",
+      "description": "Current pressed state of every button on the gamepad."
     },
     {
       "name": "cmd_vel",
       "direction": "publish",
-      "msg_type": "geometry_msgs/Twist"
+      "msg_type": "geometry_msgs/Twist",
+      "description": "Velocity command derived from the sticks. Shape depends on output_mode — diff_drive fills only linear.x + angular.z; 6dof maps all four sticks plus shoulder/trigger buttons across the full Twist."
     }
   ],
   "services": [],

@@ -7,6 +7,7 @@
       "name": "battery_state",
       "direction": "publish",
       "msg_type": "sensor_msgs/BatteryState",
+      "description": "Latest battery telemetry (voltage, current, charge percentage, status) from the configured source. The header.frame_id identifies which adapter target produced the message.",
       "qos": {
         "reliability": "best_effort",
         "history": "keep_last",

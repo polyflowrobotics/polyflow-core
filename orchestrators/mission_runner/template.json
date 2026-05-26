@@ -6,12 +6,14 @@
     {
       "name": "cmd_vel",
       "direction": "publish",
-      "msg_type": "geometry_msgs/Twist"
+      "msg_type": "geometry_msgs/Twist",
+      "description": "Velocity command produced by the currently executing mission step. Wire this into a Differential Drive node to move the base."
     },
     {
       "name": "status",
       "direction": "publish",
-      "msg_type": "std_msgs/String"
+      "msg_type": "std_msgs/String",
+      "description": "Human-readable status of the mission runner — current step name, completion, or idle."
     }
   ],
   "services": [],

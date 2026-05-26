@@ -7,6 +7,7 @@
       "name": "target_pose",
       "direction": "subscribe",
       "msg_type": "geometry_msgs/Pose",
+      "description": "Desired end-effector pose, in the root component's frame. In Studio this is bound to the scene's IK gizmo so dragging the handle drives the solver.",
       "studio_role": {
         "widget": "ik_gizmo",
         "source": "scene"
@@ -15,17 +16,20 @@
     {
       "name": "joint_states",
       "direction": "subscribe",
-      "msg_type": "sensor_msgs/JointState[]"
+      "msg_type": "sensor_msgs/JointState[]",
+      "description": "Current joint states for every joint in the chain. Used as the seed for the next solve."
     },
     {
       "name": "joint_commands",
       "direction": "publish",
-      "msg_type": "trajectory_msgs/JointTrajectoryPoint[]"
+      "msg_type": "trajectory_msgs/JointTrajectoryPoint[]",
+      "description": "Per-joint target positions produced by the solver. Wire each into the corresponding Joint Controller."
     },
     {
       "name": "current_pose",
       "direction": "publish",
       "msg_type": "geometry_msgs/Pose",
+      "description": "End-effector pose computed from joint_states via forward kinematics. Rendered as an overlay in the scene.",
       "studio_role": {
         "widget": "pose_overlay"
       }

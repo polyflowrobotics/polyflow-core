@@ -6,12 +6,14 @@
     {
       "name": "reset",
       "direction": "subscribe",
-      "msg_type": "std_msgs/Empty"
+      "msg_type": "std_msgs/Empty",
+      "description": "Zero the encoder's accumulated position when any message is received."
     },
     {
       "name": "encoder_state",
       "direction": "publish",
       "msg_type": "polyflow_msgs/EncoderState",
+      "description": "Current encoder reading — accumulated ticks, position (radians), and velocity derived from ticks_per_rev.",
       "studio_role": {
         "widget": "encoder"
       }

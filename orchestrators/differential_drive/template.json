@@ -6,32 +6,38 @@
     {
       "name": "cmd_vel_teleop",
       "direction": "subscribe",
-      "msg_type": "geometry_msgs/Twist"
+      "msg_type": "geometry_msgs/Twist",
+      "description": "Teleop velocity command. Takes priority over cmd_vel_automated whenever a fresh teleop message has arrived within teleop_timeout_s."
     },
     {
       "name": "cmd_vel_automated",
       "direction": "subscribe",
-      "msg_type": "geometry_msgs/Twist"
+      "msg_type": "geometry_msgs/Twist",
+      "description": "Autonomy or scripted velocity command. Used only when no recent teleop message is present."
     },
     {
       "name": "front_left_motor",
       "direction": "publish",
-      "msg_type": "std_msgs/Float64"
+      "msg_type": "std_msgs/Float64",
+      "description": "Front-left wheel angular velocity (rad/s) derived from the active cmd_vel and the configured kinematics."
     },
     {
       "name": "rear_left_motor",
       "direction": "publish",
-      "msg_type": "std_msgs/Float64"
+      "msg_type": "std_msgs/Float64",
+      "description": "Rear-left wheel angular velocity (rad/s). Mirrors front_left_motor on a standard 4-wheel diff-drive base."
     },
     {
       "name": "front_right_motor",
       "direction": "publish",
-      "msg_type": "std_msgs/Float64"
+      "msg_type": "std_msgs/Float64",
+      "description": "Front-right wheel angular velocity (rad/s) derived from the active cmd_vel and the configured kinematics."
     },
     {
       "name": "rear_right_motor",
       "direction": "publish",
-      "msg_type": "std_msgs/Float64"
+      "msg_type": "std_msgs/Float64",
+      "description": "Rear-right wheel angular velocity (rad/s). Mirrors front_right_motor on a standard 4-wheel diff-drive base."
     }
   ],
   "services": [],

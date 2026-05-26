@@ -7,6 +7,7 @@
       "name": "trajectory",
       "direction": "subscribe",
       "msg_type": "trajectory_msgs/JointTrajectoryPoint",
+      "description": "Trajectory point for the selected joint — position, velocity, and/or effort, interpreted according to the active mode.",
       "qos": {
         "reliability": "reliable",
         "history": "keep_last",
@@ -20,6 +21,7 @@
       "name": "mode",
       "direction": "subscribe",
       "msg_type": "std_msgs/String",
+      "description": "Switch the controller's active loop at runtime: position, velocity, or torque. Overrides default_mode.",
       "allowed_values": ["position", "velocity", "torque"],
       "studio_role": {
         "widget": "string"
@@ -29,6 +31,7 @@
       "name": "state",
       "direction": "publish",
       "msg_type": "sensor_msgs/JointState",
+      "description": "Live joint feedback — position (rad), velocity (rad/s), and effort (Nm) — for the joint this controller manages.",
       "qos": {
         "reliability": "best_effort",
         "history": "keep_last",

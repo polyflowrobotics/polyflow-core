@@ -6,12 +6,14 @@
     {
       "name": "capture",
       "direction": "subscribe",
-      "msg_type": "std_msgs/Empty"
+      "msg_type": "std_msgs/Empty",
+      "description": "Trigger a one-off frame capture on demand. Usually unused when FPS streaming is enabled."
     },
     {
       "name": "frame",
       "direction": "publish",
       "msg_type": "polyflow_msgs/CameraFrame",
+      "description": "Most recent camera frame at the configured resolution and frame rate.",
       "studio_role": {
         "widget": "video"
       }
