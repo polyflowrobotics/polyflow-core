@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import time
 import asyncio
@@ -13,6 +14,44 @@ from std_msgs.msg import String
 from typing import Any, Dict, List, Optional, Set, Union
 
 from common.polyflow_kernel import PolyflowKernel
+
+
+def ros_safe_token(raw_id: str) -> str:
+    """
+    Convert a raw identifier into a valid ROS topic-name token.
+
+    ROS topic name tokens may not contain hyphens and may not start with a
+    digit. Polyflow IDs are Mongo ObjectIds (24-char hex, often digit-leading),
+    so we replace hyphens with underscores and prefix digit-leading tokens
+    with 'n'. Must match the convention used by topic publishers (e.g. the
+    hardware adapter host in polyflow-os).
+    """
+    safe = raw_id.replace('-', '_')
+    if safe and safe[0].isdigit():
+        safe = f"n{safe}"
+    return safe
+
+
+def ros_hardware_topic_token(raw_id: str) -> str:
+    """
+    Convert a hardware target id into the topic-name token used on the
+    /prp/hardware/* namespace.
+
+    This namespace is shared with polyflow-os: the system-manager publishes
+    state on the result of (studio's `toRosSafeId` -> polyflow-os's
+    `_ros_token`). To subscribe to the matching topic we must reproduce both
+    transforms exactly:
+      1. replace every char outside [A-Za-z0-9_] with '_'  (studio toRosSafeId)
+      2. prefix with 'id_' when the first char isn't a letter/underscore
+         (polyflow-os _ros_token; Mongo ObjectIds are digit-leading)
+
+    NOTE: this differs from `ros_safe_token` (the 'n'-prefix convention used
+    on the /prp/nodes/* namespace, which is owned entirely by polyflow-core).
+    """
+    safe = re.sub(r"[^A-Za-z0-9_]", "_", raw_id)
+    if safe and not (safe[0].isalpha() or safe[0] == "_"):
+        safe = f"id_{safe}"
+    return safe
 
 
 def _ros_msg_to_dict(msg: Any) -> dict:
@@ -91,9 +130,7 @@ class PolyflowNode(Node):
 
         # Sanitize node_id for use in ROS node names and topic paths
         # (no hyphens, must not start with a number)
-        self.ros_safe_id = self.node_id.replace('-', '_')
-        if self.ros_safe_id[0].isdigit():
-            self.ros_safe_id = f"n{self.ros_safe_id}"
+        self.ros_safe_id = ros_safe_token(self.node_id)
         super().__init__(self.ros_safe_id)
 
         # --- Load Parameters & Configuration ---
@@ -213,9 +250,7 @@ class PolyflowNode(Node):
             if conn.get("target_pin_id") == pin_id:
                 source_node_id = conn.get("source_node_id")
                 source_pin_id = conn.get("source_pin_id")
-                safe_source_id = source_node_id.replace('-', '_')
-                if safe_source_id[0].isdigit():
-                    safe_source_id = f"n{safe_source_id}"
+                safe_source_id = ros_safe_token(source_node_id)
                 topic = f"/prp/nodes/{safe_source_id}/outputs/{source_pin_id}"
 
                 sub = self.create_subscription(
@@ -229,9 +264,7 @@ class PolyflowNode(Node):
                 sources_found = True
 
         # Direct-injection topic for external clients (studio).
-        safe_self_id = self.node_id.replace('-', '_')
-        if safe_self_id[0].isdigit():
-            safe_self_id = f"n{safe_self_id}"
+        safe_self_id = ros_safe_token(self.node_id)
         injection_topic = f"/prp/nodes/{safe_self_id}/inputs/{pin_id}"
         injection_sub = self.create_subscription(
             msg_type,

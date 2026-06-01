@@ -4,7 +4,12 @@ from typing import Optional
 from std_msgs.msg import Float64
 from polyflow_msgs.msg import MotorCommand, MotorState
 
-from common.polyflow_node import PolyflowNode, _dict_to_ros_msg, _ros_msg_to_dict
+from common.polyflow_node import (
+    PolyflowNode,
+    _dict_to_ros_msg,
+    _ros_msg_to_dict,
+    ros_hardware_topic_token,
+)
 from motor_controller.kernel import MotorControllerKernel
 
 
@@ -33,7 +38,7 @@ class MotorControllerNode(PolyflowNode):
         motor_id = self.kernel.motor_id
         self._state_subscription: Optional[object] = None
         if motor_id:
-            topic = f"/prp/hardware/state/{motor_id}/motor_state"
+            topic = f"/prp/hardware/state/{ros_hardware_topic_token(motor_id)}/motor_state"
             self._state_subscription = self.create_subscription(
                 MotorState,
                 topic,

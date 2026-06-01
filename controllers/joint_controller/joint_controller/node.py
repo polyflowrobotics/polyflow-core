@@ -16,7 +16,12 @@ from sensor_msgs.msg import JointState as ROSJointState
 from trajectory_msgs.msg import JointTrajectoryPoint
 from polyflow_msgs.msg import JointCommand, JointState
 
-from common.polyflow_node import PolyflowNode, _dict_to_ros_msg, _ros_msg_to_dict
+from common.polyflow_node import (
+    PolyflowNode,
+    _dict_to_ros_msg,
+    _ros_msg_to_dict,
+    ros_hardware_topic_token,
+)
 from joint_controller.kernel import JointControllerKernel
 
 
@@ -42,7 +47,7 @@ class JointControllerNode(PolyflowNode):
         joint_id = self.kernel.joint_id
         self._state_subscription: Optional[object] = None
         if joint_id:
-            topic = f"/prp/hardware/state/{joint_id}/joint_state"
+            topic = f"/prp/hardware/state/{ros_hardware_topic_token(joint_id)}/joint_state"
             self._state_subscription = self.create_subscription(
                 JointState,
                 topic,
