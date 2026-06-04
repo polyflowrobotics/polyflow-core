@@ -18,9 +18,9 @@ class DifferentialDriveNode(PolyflowNode):
         self.register_input_pin("cmd_vel_automated", Twist)
 
         self.register_output_pin("front_left_motor", Float64)
-        self.register_output_pin("rear_left_motor", Float64)
+        self.register_output_pin("back_left_motor", Float64)
         self.register_output_pin("front_right_motor", Float64)
-        self.register_output_pin("rear_right_motor", Float64)
+        self.register_output_pin("back_right_motor", Float64)
 
         self.get_logger().info(
             f"DifferentialDrive | wheel_radius={self.kernel.wheel_radius} | "
