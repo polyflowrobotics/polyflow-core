@@ -22,10 +22,10 @@
       "description": "Front-left wheel angular velocity (rad/s) derived from the active cmd_vel and the configured kinematics."
     },
     {
-      "name": "rear_left_motor",
+      "name": "back_left_motor",
       "direction": "publish",
       "msg_type": "std_msgs/Float64",
-      "description": "Rear-left wheel angular velocity (rad/s). Mirrors front_left_motor on a standard 4-wheel diff-drive base."
+      "description": "Back-left wheel angular velocity (rad/s). Mirrors front_left_motor on a standard 4-wheel diff-drive base."
     },
     {
       "name": "front_right_motor",
@@ -34,10 +34,10 @@
       "description": "Front-right wheel angular velocity (rad/s) derived from the active cmd_vel and the configured kinematics."
     },
     {
-      "name": "rear_right_motor",
+      "name": "back_right_motor",
       "direction": "publish",
       "msg_type": "std_msgs/Float64",
-      "description": "Rear-right wheel angular velocity (rad/s). Mirrors front_right_motor on a standard 4-wheel diff-drive base."
+      "description": "Back-right wheel angular velocity (rad/s). Mirrors front_right_motor on a standard 4-wheel diff-drive base."
     }
   ],
   "services": [],

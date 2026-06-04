@@ -27,7 +27,7 @@ class DifferentialDriveKernel(PolyflowKernel):
         cmd_vel_automated   — {"linear": {"x": ...}, "angular": {"z": ...}}
 
     Output pins (as dicts):
-        front_left_motor, rear_left_motor, front_right_motor, rear_right_motor
+        front_left_motor, back_left_motor, front_right_motor, back_right_motor
                             — {"data": <speed_float>}
 
     Parameters:
@@ -58,9 +58,9 @@ class DifferentialDriveKernel(PolyflowKernel):
         right_rad_s = right_speed / self.wheel_radius
 
         self.emit("front_left_motor", {"data": left_rad_s})
-        self.emit("rear_left_motor", {"data": left_rad_s})
+        self.emit("back_left_motor", {"data": left_rad_s})
         self.emit("front_right_motor", {"data": right_rad_s})
-        self.emit("rear_right_motor", {"data": right_rad_s})
+        self.emit("back_right_motor", {"data": right_rad_s})
 
     def _select_command(self) -> dict:
         teleop_age = time.monotonic() - self._last_teleop_ts

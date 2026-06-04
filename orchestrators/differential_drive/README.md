@@ -9,9 +9,9 @@
 | `cmd_vel_teleop` | subscribe | `geometry_msgs/Twist` | Operator / gamepad command. Takes priority while fresh. |
 | `cmd_vel_automated` | subscribe | `geometry_msgs/Twist` | Autonomous planner command. Used when teleop is stale or has never published. |
 | `front_left_motor` | publish | `std_msgs/Float64` | Left-side wheel speed (rad/s). |
-| `rear_left_motor` | publish | `std_msgs/Float64` | Left-side wheel speed (rad/s). |
+| `back_left_motor` | publish | `std_msgs/Float64` | Left-side wheel speed (rad/s). |
 | `front_right_motor` | publish | `std_msgs/Float64` | Right-side wheel speed (rad/s). |
-| `rear_right_motor` | publish | `std_msgs/Float64` | Right-side wheel speed (rad/s). |
+| `back_right_motor` | publish | `std_msgs/Float64` | Right-side wheel speed (rad/s). |
 
 ## Parameters
 
