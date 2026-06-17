@@ -76,6 +76,19 @@ class PolyflowKernel:
                 return self.parameters[key]
         return default
 
+    def set_param(self, key: str, value: Any):
+        """Live-update a parameter while the node is running.
+
+        Called by host wrappers when the user edits a node parameter in
+        Studio. The default implementation stores the new value and re-runs
+        setup() so attributes cached from self.parameters pick it up — which
+        also resets any internal state setup() initialises. Subclasses with
+        state worth preserving across a parameter change (integrators,
+        counters) should override this and apply the value directly.
+        """
+        self.parameters[key] = value
+        self.setup()
+
     def should_run(self, trigger_info: Optional[Dict[str, Any]] = None) -> bool:
         if self._run_state == "RUN":
             for bp_id, bp_details in self._active_breakpoints.items():
