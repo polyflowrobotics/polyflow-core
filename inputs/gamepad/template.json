@@ -47,37 +47,13 @@
       "description": "Axis deadzone threshold.",
       "ui": { "group": "Gamepad", "order": 3 }
     },
-    "max_linear_speed": {
-      "label": "Max Linear Speed",
-      "type": "number",
-      "units": "m/s",
-      "default": 1.0,
-      "description": "Maximum forward/backward speed for cmd_vel output.",
-      "ui": { "group": "Velocity", "order": 1 }
-    },
-    "max_angular_speed": {
-      "label": "Max Angular Speed",
-      "type": "number",
-      "units": "rad/s",
-      "default": 2.0,
-      "description": "Maximum turning rate for cmd_vel output. Used only in 6dof mode; in diff_drive (tank) mode angular.z is derived from max_linear_speed and wheel_separation.",
-      "ui": { "group": "Velocity", "order": 2 }
-    },
-    "wheel_separation": {
-      "label": "Wheel Separation",
-      "type": "number",
-      "units": "m",
-      "default": 0.3,
-      "description": "Distance between left and right wheels. Used only in diff_drive (tank) mode. Must match the Differential Drive node's wheel_separation.",
-      "ui": { "group": "Velocity", "order": 3 }
-    },
     "output_mode": {
       "label": "cmd_vel Mapping",
       "type": "string",
       "default": "diff_drive",
       "allowed_values": ["diff_drive", "6dof"],
-      "description": "diff_drive fills only linear.x + angular.z (for differential-drive bases). 6dof maps all four sticks plus shoulder/trigger buttons across the full Twist (for pose-controlled arms / IK).",
-      "ui": { "group": "Velocity", "order": 4 }
+      "description": "diff_drive fills only linear.x + angular.z (for differential-drive bases). 6dof maps all four sticks plus shoulder/trigger buttons across the full Twist (for pose-controlled arms / IK). Output is normalized to [-1, 1] either way.",
+      "ui": { "group": "Velocity", "order": 1 }
     }
   },
   "defaults": {

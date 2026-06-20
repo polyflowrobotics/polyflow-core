@@ -19,54 +19,30 @@
       "name": "front_left_motor",
       "direction": "publish",
       "msg_type": "std_msgs/Float64",
-      "description": "Front-left wheel angular velocity (rad/s) derived from the active cmd_vel and the configured kinematics."
+      "description": "Front-left wheel command, normalized to [-1, 1]. Speed is applied downstream by the motor controller (scaled by the joint's max_velocity)."
     },
     {
       "name": "back_left_motor",
       "direction": "publish",
       "msg_type": "std_msgs/Float64",
-      "description": "Back-left wheel angular velocity (rad/s). Mirrors front_left_motor on a standard 4-wheel diff-drive base."
+      "description": "Back-left wheel command, normalized to [-1, 1]. Mirrors front_left_motor on a standard 4-wheel diff-drive base."
     },
     {
       "name": "front_right_motor",
       "direction": "publish",
       "msg_type": "std_msgs/Float64",
-      "description": "Front-right wheel angular velocity (rad/s) derived from the active cmd_vel and the configured kinematics."
+      "description": "Front-right wheel command, normalized to [-1, 1]. Speed is applied downstream by the motor controller (scaled by the joint's max_velocity)."
     },
     {
       "name": "back_right_motor",
       "direction": "publish",
       "msg_type": "std_msgs/Float64",
-      "description": "Back-right wheel angular velocity (rad/s). Mirrors front_right_motor on a standard 4-wheel diff-drive base."
+      "description": "Back-right wheel command, normalized to [-1, 1]. Mirrors front_right_motor on a standard 4-wheel diff-drive base."
     }
   ],
   "services": [],
   "actions": [],
   "parameters_schema": {
-    "wheel_radius": {
-      "label": "Wheel Radius",
-      "type": "number",
-      "units": "m",
-      "default": 0.05,
-      "description": "Wheel radius in meters.",
-      "ui": { "group": "Kinematics", "order": 1 }
-    },
-    "wheel_separation": {
-      "label": "Wheel Separation",
-      "type": "number",
-      "units": "m",
-      "default": 0.3,
-      "description": "Distance between left and right wheels in meters.",
-      "ui": { "group": "Kinematics", "order": 2 }
-    },
-    "max_wheel_speed": {
-      "label": "Max Wheel Speed",
-      "type": "number",
-      "units": "m/s",
-      "default": 1.0,
-      "description": "Maximum wheel speed in m/s.",
-      "ui": { "group": "Kinematics", "order": 3 }
-    },
     "teleop_timeout_s": {
       "label": "Teleop Timeout",
       "type": "number",

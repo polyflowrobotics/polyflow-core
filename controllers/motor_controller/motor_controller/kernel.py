@@ -34,9 +34,13 @@ class MotorControllerKernel(PolyflowKernel):
 
     Parameters:
         motor_id:   User-defined string ID (e.g., "left_drive").
-        max_speed:  Clamp for SPEED mode. Ignored in DUTY mode (clamps to [-1, 1]).
+        max_speed:  Full-scale speed in rad/s, bound to the joint's
+                    max_velocity. In SPEED mode the normalized [-1, 1] command
+                    is scaled by this — the motor controller is the single place
+                    speed is applied. Upstream nodes (gamepad, differential
+                    drive) only pass normalized values. Ignored in DUTY mode.
         mode:       "speed" (default) or "duty".
-        reverse:    Negate command before clamping; for motors mounted
+        reverse:    Negate command before scaling; for motors mounted
                     mirrored from the convention (e.g. left-side drive
                     wheels whose joint axis points opposite the right side).
         timeout_s:  Watchdog seconds applied to every command; 0 = adapter default.
@@ -64,10 +68,14 @@ class MotorControllerKernel(PolyflowKernel):
         raw = float(data.get("data", 0.0))
         if self.reverse:
             raw = -raw
+        # Command is a normalized [-1, 1] setpoint from upstream. DUTY emits it
+        # as-is (normalized duty); SPEED scales it by max_speed (the joint's
+        # max_velocity) so this node is the single place speed is applied.
+        norm = max(-1.0, min(1.0, raw))
         if self.mode == _MODE_DUTY:
-            self._current_value = max(-1.0, min(1.0, raw))
+            self._current_value = norm
         else:
-            self._current_value = max(-self.max_speed, min(self.max_speed, raw))
+            self._current_value = norm * self.max_speed
 
         self.emit("hw_command", {
             "motor_id": self.motor_id,

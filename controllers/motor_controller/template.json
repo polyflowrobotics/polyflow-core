@@ -7,7 +7,7 @@
       "name": "command",
       "direction": "subscribe",
       "msg_type": "std_msgs/Float64",
-      "description": "Motor setpoint. Interpreted as rad/s in speed mode or as a normalized [-1, 1] duty in duty mode. Negated when Reverse is enabled.",
+      "description": "Normalized [-1, 1] motor setpoint. In speed mode it is scaled by Max Speed (the joint's max_velocity) to rad/s; in duty mode it is emitted directly as a [-1, 1] duty. Negated when Reverse is enabled.",
       "studio_role": {
         "widget": "slider"
       }

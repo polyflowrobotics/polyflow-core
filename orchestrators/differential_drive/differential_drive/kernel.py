@@ -28,39 +28,37 @@ class DifferentialDriveKernel(PolyflowKernel):
 
     Output pins (as dicts):
         front_left_motor, back_left_motor, front_right_motor, back_right_motor
-                            — {"data": <speed_float>}
+                            — {"data": <normalized [-1, 1]>}
+
+    Inputs and outputs are all normalized to [-1, 1]. This node only does
+    skid-steer kinematics — it does not apply speed. The downstream motor
+    controllers scale the normalized command by their max_speed (the joint's
+    max_velocity), so speed lives in exactly one place.
 
     Parameters:
-        wheel_radius:       Wheel radius in meters (default: 0.05).
-        wheel_separation:   Distance between left and right wheels in meters (default: 0.3).
-        max_wheel_speed:    Maximum wheel speed in m/s (default: 1.0).
         teleop_timeout_s:   Seconds without a teleop message before we fall
                             back to automated (default: 1.0).
     """
 
     def setup(self):
-        self.wheel_radius = float(self.get_param("wheel_radius", 0.05))
-        self.wheel_separation = float(self.get_param("wheel_separation", 0.3))
-        self.max_wheel_speed = float(self.get_param("max_wheel_speed", 1.0))
         self.teleop_timeout_s = float(self.get_param("teleop_timeout_s", 1.0))
 
         self._last_teleop_cmd = _ZERO_TWIST
         self._last_teleop_ts = 0.0
         self._last_automated_cmd = _ZERO_TWIST
 
-    def _clamp(self, value: float) -> float:
-        return max(-self.max_wheel_speed, min(self.max_wheel_speed, value))
+    @staticmethod
+    def _clamp(value: float) -> float:
+        return max(-1.0, min(1.0, value))
 
-    def _emit_motor_commands(self, left_speed: float, right_speed: float):
-        left_speed = self._clamp(left_speed)
-        right_speed = self._clamp(right_speed)
-        left_rad_s = left_speed / self.wheel_radius
-        right_rad_s = right_speed / self.wheel_radius
+    def _emit_motor_commands(self, left: float, right: float):
+        left = self._clamp(left)
+        right = self._clamp(right)
 
-        self.emit("front_left_motor", {"data": left_rad_s})
-        self.emit("back_left_motor", {"data": left_rad_s})
-        self.emit("front_right_motor", {"data": right_rad_s})
-        self.emit("back_right_motor", {"data": right_rad_s})
+        self.emit("front_left_motor", {"data": left})
+        self.emit("back_left_motor", {"data": left})
+        self.emit("front_right_motor", {"data": right})
+        self.emit("back_right_motor", {"data": right})
 
     def _select_command(self) -> dict:
         teleop_age = time.monotonic() - self._last_teleop_ts
@@ -69,11 +67,14 @@ class DifferentialDriveKernel(PolyflowKernel):
         return self._last_automated_cmd
 
     def _emit_from_command(self, cmd: dict):
+        # Normalized skid-steer: linear.x and angular.z are in [-1, 1]. Inverts
+        # the gamepad's tank encoding (linear.x = (l+r)/2, angular.z = (r-l)/2)
+        # back to per-side normalized commands.
         linear = cmd["linear"]["x"]
         angular = cmd["angular"]["z"]
-        left_speed = linear - (angular * self.wheel_separation / 2.0)
-        right_speed = linear + (angular * self.wheel_separation / 2.0)
-        self._emit_motor_commands(left_speed, right_speed)
+        left = linear - angular
+        right = linear + angular
+        self._emit_motor_commands(left, right)
 
     def process_input(self, pin_id: str, data: dict):
         if not self.should_run(trigger_info={"pin_id": pin_id}):

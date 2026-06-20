@@ -12,8 +12,8 @@ KEEPALIVE_INTERVAL_S = 0.2
 # don't warrant a publish on their own — keepalive will pick them up.
 AXIS_CHANGE_THRESHOLD = 0.01
 
-# Twist component change threshold in m/s or rad/s. Computed from axes scaled
-# by max_*_speed, so this lives in physical units.
+# Twist component change threshold, in normalized [-1, 1] units (cmd_vel is
+# normalized — speed scaling happens downstream at the motor controllers).
 TWIST_CHANGE_THRESHOLD = 0.01
 
 
@@ -30,20 +30,14 @@ class GamepadKernel(PolyflowKernel):
     This keeps idle traffic low (~5 Hz instead of poll_rate_hz) while still
     letting downstream consumers detect liveness from message arrival.
 
+    cmd_vel is emitted normalized to [-1, 1]; this node applies no speed
+    scaling. The downstream motor controllers scale the normalized command by
+    their max_speed (the joint's max_velocity), so speed lives in one place.
+
     Parameters:
         device_index:       Gamepad device index (default: 0).
         poll_rate_hz:       How often to poll the device (default: 60).
         deadzone:           Axis deadzone threshold (default: 0.05).
-        max_linear_speed:   Max linear speed in m/s (default: 1.0).
-        max_angular_speed:  Max angular rate in rad/s (default: 2.0). Used only
-                            in "6dof" mode; in tank mode angular.z is derived
-                            from max_linear_speed and wheel_separation so the
-                            Twist round-trips cleanly through standard
-                            skid-steer kinematics.
-        wheel_separation:   Distance between left and right wheels in meters
-                            (default: 0.3). Used only in tank mode. Must match
-                            the diff-drive node's wheel_separation, otherwise
-                            pushing one stick will spin both sides.
         output_mode:        cmd_vel mapping: "diff_drive" (default) or "6dof".
                             "diff_drive" is tank-style: left stick Y drives the
                             left tread, right stick Y drives the right tread.
@@ -56,9 +50,6 @@ class GamepadKernel(PolyflowKernel):
         self.device_index = int(self.get_param("device_index", 0))
         self.poll_rate_hz = float(self.get_param("poll_rate_hz", 60.0))
         self.deadzone = float(self.get_param("deadzone", 0.05))
-        self.max_linear_speed = float(self.get_param("max_linear_speed", 1.0))
-        self.max_angular_speed = float(self.get_param("max_angular_speed", 2.0))
-        self.wheel_separation = float(self.get_param("wheel_separation", 0.3))
         self.output_mode = str(self.get_param("output_mode", "diff_drive"))
         self._connected = False
 
@@ -131,6 +122,9 @@ class GamepadKernel(PolyflowKernel):
         }
         self._maybe_emit("buttons", button_state, self._buttons_changed)
 
+        # Output is a normalized [-1, 1] Twist — no speed scaling here. The
+        # motor controllers downstream scale the normalized command by their
+        # max_speed (the joint's max_velocity), so speed lives in one place.
         if self.output_mode == "6dof":
             # ROS body-frame conventions: +x forward, +y left, +z up.
             # Browser stick Y is positive when pushed down, so negate.
@@ -140,14 +134,14 @@ class GamepadKernel(PolyflowKernel):
             lb = 1.0 if btn.get("lb", False) else 0.0
             twist = {
                 "linear": {
-                    "x": -left_y * self.max_linear_speed,
-                    "y": -left_x * self.max_linear_speed,
-                    "z": (rt - lt) * self.max_linear_speed,
+                    "x": -left_y,
+                    "y": -left_x,
+                    "z": rt - lt,
                 },
                 "angular": {
-                    "x": (rb - lb) * self.max_angular_speed,
-                    "y": -right_y * self.max_angular_speed,
-                    "z": -right_x * self.max_angular_speed,
+                    "x": rb - lb,
+                    "y": -right_y,
+                    "z": -right_x,
                 },
             }
         else:
@@ -155,13 +149,13 @@ class GamepadKernel(PolyflowKernel):
             # drives the right tread. Browser stick Y is positive when pushed
             # down, so negate so stick-up = forward.
             #
-            # Encode (left_v, right_v) into a Twist that inverts cleanly through
-            # standard skid-steer kinematics
-            # (left = lin - ang·s/2, right = lin + ang·s/2):
+            # Encode (left_v, right_v) into a normalized Twist that inverts
+            # cleanly through the diff-drive node's skid-steer kinematics
+            # (left = lin - ang, right = lin + ang):
             #   linear.x  = (left_v + right_v) / 2
-            #   angular.z = (right_v - left_v) / wheel_separation
-            left_v = -left_y * self.max_linear_speed
-            right_v = -right_y * self.max_linear_speed
+            #   angular.z = (right_v - left_v) / 2
+            left_v = -left_y
+            right_v = -right_y
             twist = {
                 "linear": {
                     "x": (left_v + right_v) / 2.0,
@@ -171,7 +165,7 @@ class GamepadKernel(PolyflowKernel):
                 "angular": {
                     "x": 0.0,
                     "y": 0.0,
-                    "z": (right_v - left_v) / self.wheel_separation,
+                    "z": (right_v - left_v) / 2.0,
                 },
             }
         self._maybe_emit("cmd_vel", twist, self._twist_changed)
